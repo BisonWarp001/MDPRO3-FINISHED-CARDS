@@ -3,13 +3,12 @@ local s,id=GetID()
 
 function s.initial_effect(c)
 	-- Synchro Summon
-	aux.AddSynchroProcedure(c,s.tfilter,aux.NonTuner(nil),1)
+	aux.AddSynchroProcedure(c,s.tfilter,aux.NonTuner(nil),2)
 	c:EnableReviveLimit()
 
 	-------------------------------------------------
 	--① Opponent cannot banish cards
 	-------------------------------------------------
-	--① Your opponent cannot banish cards
 	local e1=Effect.CreateEffect(c)
 	e1:SetType(EFFECT_TYPE_FIELD)
 	e1:SetCode(EFFECT_CANNOT_REMOVE)
@@ -19,7 +18,7 @@ function s.initial_effect(c)
 	c:RegisterEffect(e1)
 
 	-------------------------------------------------
-	--② Main Phase (Quick): Banish 1 card (HOPT)
+	--② Main Phase Quick Effect: Banish up to 3 cards (SOPT)
 	-------------------------------------------------
 	local e2=Effect.CreateEffect(c)
 	e2:SetDescription(aux.Stringid(id,0))
@@ -27,7 +26,7 @@ function s.initial_effect(c)
 	e2:SetType(EFFECT_TYPE_QUICK_O)
 	e2:SetCode(EVENT_FREE_CHAIN)
 	e2:SetRange(LOCATION_MZONE)
-	e2:SetCountLimit(1)
+	e2:SetCountLimit(1) -- SOPT
 	e2:SetCondition(s.rmcon)
 	e2:SetTarget(s.rmtg)
 	e2:SetOperation(s.rmop)
@@ -44,7 +43,7 @@ function s.initial_effect(c)
 	c:RegisterEffect(e3)
 
 	-------------------------------------------------
-	--④ End Phase self-revival (HOPT)
+	--④ End Phase Self-Revival 
 	-------------------------------------------------
 	local e4=Effect.CreateEffect(c)
 	e4:SetDescription(aux.Stringid(id,1))
@@ -60,67 +59,59 @@ function s.initial_effect(c)
 	c:RegisterEffect(e4)
 
 	-------------------------------------------------
-	--⑤ When Summoned this way: Set 1 "Nordic Horror" Trap
+	--⑤ When Summoned this way: Set 1 "Nordic Horror" Trap (SOPT)
 	-------------------------------------------------
 	local e5=Effect.CreateEffect(c)
 	e5:SetDescription(aux.Stringid(id,2))
 	e5:SetType(EFFECT_TYPE_SINGLE+EFFECT_TYPE_TRIGGER_O)
 	e5:SetCode(EVENT_SPSUMMON_SUCCESS)
+	e5:SetCountLimit(1) -- SOPT
 	e5:SetCondition(s.setcon)
 	e5:SetTarget(s.settg)
 	e5:SetOperation(s.setop)
 	c:RegisterEffect(e5)
 end
 
-
 -------------------------------------------------
 -- Synchro material filter
 -------------------------------------------------
 function s.tfilter(c)
-	return c:IsSetCard(0xa042)
-end
--------------------------------------------------
---① Opponent cannot banish
--------------------------------------------------
-function s.removelimit(e,c)
-	return c:IsAbleToRemove()
+	if not c:IsType(TYPE_TUNER) then return false end
+	return c:IsSetCard(0x3042)
+		or c:IsSetCard(0x6042)
+		or c:IsSetCard(0xA042)
+		or c:IsHasEffect(61777313)
 end
 
+
 -------------------------------------------------
---② Quick Effect (Main Phase only)
+--② Main Phase Quick Effect: Banish cards based on Aesir you control
 -------------------------------------------------
 function s.rmcon(e,tp)
+	-- Solo en tu Main Phase 1 o 2
 	local ph=Duel.GetCurrentPhase()
-	return ph==PHASE_MAIN1 or ph==PHASE_MAIN2
+	return (ph==PHASE_MAIN1 or ph==PHASE_MAIN2) and Duel.GetTurnPlayer()==tp
 end
 
 function s.rmfilter(c)
 	return c:IsAbleToRemove()
 end
 
-function s.rmtg(e,tp,eg,ep,ev,re,r,rp,chk,chkc)
-	if chkc then
-		return chkc:IsLocation(LOCATION_GRAVE)
-			and chkc:IsAbleToRemove()
+function s.rmtg(e,tp,eg,ep,ev,re,r,rp,chk)
+	local ct=Duel.GetMatchingGroupCount(Card.IsSetCard,tp,LOCATION_MZONE,0,nil,0x4b) -- Contar Aesir que controlas
+	if chk==0 then 
+		return ct>0 and Duel.IsExistingMatchingCard(s.rmfilter,tp,0,LOCATION_GRAVE,1,nil) 
 	end
-	if chk==0 then
-		return Duel.IsExistingTarget(
-			Card.IsAbleToRemove,
-			tp,LOCATION_GRAVE,LOCATION_GRAVE,1,nil
-		)
-	end
-	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_REMOVE)
-	local g=Duel.SelectTarget(
-		tp,Card.IsAbleToRemove,
-		tp,LOCATION_GRAVE,LOCATION_GRAVE,1,1,nil
-	)
-	Duel.SetOperationInfo(0,CATEGORY_REMOVE,g,1,0,0)
+	Duel.SetOperationInfo(0,CATEGORY_REMOVE,nil,1,1-tp,LOCATION_GRAVE)
 end
 
 function s.rmop(e,tp,eg,ep,ev,re,r,rp)
-	local tc=Duel.GetFirstTarget()
-	if tc and tc:IsRelateToEffect(e) then
-		Duel.Remove(tc,POS_FACEUP,REASON_EFFECT)
+	local ct=Duel.GetMatchingGroupCount(Card.IsSetCard,tp,LOCATION_MZONE,0,nil,0x4b)
+	if ct==0 then return end
+	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_REMOVE)
+	local g=Duel.SelectMatchingCard(tp,s.rmfilter,tp,0,LOCATION_GRAVE,1,ct,nil) -- Hasta X cartas
+	if #g>0 then
+		Duel.Remove(g,POS_FACEUP,REASON_EFFECT)
 	end
 end
 
@@ -134,14 +125,14 @@ function s.regop(e,tp,eg,ep,ev,re,r,rp)
 		and c:IsPreviousLocation(LOCATION_MZONE)
 		and c:IsPreviousPosition(POS_FACEUP)
 		and c:IsReason(REASON_DESTROY) then
-		c:RegisterFlagEffect(id,RESET_PHASE+PHASE_END,0,1)
+		c:RegisterFlagEffect(id,RESET_EVENT+RESETS_STANDARD+RESET_PHASE+PHASE_END,0,1)
 	end
 end
 
 -------------------------------------------------
 --④ Revival
 -------------------------------------------------
-function s.spcon(e,tp)
+function s.spcon(e,tp,eg,ep,ev,re,r,rp)
 	return e:GetHandler():GetFlagEffect(id)~=0
 end
 
@@ -153,14 +144,10 @@ end
 
 function s.spcost(e,tp,eg,ep,ev,re,r,rp,chk)
 	if chk==0 then
-		return Duel.IsExistingMatchingCard(
-			s.cfilter,tp,LOCATION_GRAVE,0,1,nil
-		)
+		return Duel.IsExistingMatchingCard(s.cfilter,tp,LOCATION_GRAVE,0,1,nil)
 	end
 	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_REMOVE)
-	local g=Duel.SelectMatchingCard(
-		tp,s.cfilter,tp,LOCATION_GRAVE,0,1,1,nil
-	)
+	local g=Duel.SelectMatchingCard(tp,s.cfilter,tp,LOCATION_GRAVE,0,1,1,nil)
 	Duel.Remove(g,POS_FACEUP,REASON_COST)
 end
 
@@ -170,18 +157,13 @@ function s.sptg(e,tp,eg,ep,ev,re,r,rp,chk)
 		return Duel.GetLocationCount(tp,LOCATION_MZONE)>0
 			and c:IsCanBeSpecialSummoned(e,0,tp,false,false)
 	end
-	Duel.SetOperationInfo(
-		0,CATEGORY_SPECIAL_SUMMON,c,1,0,0
-	)
+	Duel.SetOperationInfo(0,CATEGORY_SPECIAL_SUMMON,c,1,0,0)
 end
 
 function s.spop(e,tp,eg,ep,ev,re,r,rp)
-	if e:GetHandler():IsRelateToEffect(e) then
-		Duel.SpecialSummon(
-			e:GetHandler(),
-			SUMMON_VALUE_SELF,
-			tp,tp,false,false,POS_FACEUP
-		)
+	local c=e:GetHandler()
+	if c:IsRelateToEffect(e) then
+		Duel.SpecialSummon(c,SUMMON_VALUE_SELF,tp,tp,false,false,POS_FACEUP)
 	end
 end
 
@@ -189,29 +171,24 @@ end
 --⑤ When Summoned this way
 -------------------------------------------------
 function s.setcon(e,tp,eg,ep,ev,re,r,rp)
-	return e:GetHandler():GetSummonType()
-		== SUMMON_TYPE_SPECIAL + SUMMON_VALUE_SELF
+	return e:GetHandler():GetSummonType()==SUMMON_TYPE_SPECIAL+SUMMON_VALUE_SELF
 end
 
 function s.setfilter(c)
-	return c:IsSetCard(0x41a)
+	return c:IsSetCard(0x7042)
 		and c:IsType(TYPE_TRAP)
 		and c:IsSSetable()
 end
 
 function s.settg(e,tp,eg,ep,ev,re,r,rp,chk)
 	if chk==0 then
-		return Duel.IsExistingMatchingCard(
-			s.setfilter,tp,LOCATION_DECK,0,1,nil
-		)
+		return Duel.IsExistingMatchingCard(s.setfilter,tp,LOCATION_DECK,0,1,nil)
 	end
 end
 
 function s.setop(e,tp,eg,ep,ev,re,r,rp)
 	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_SET)
-	local g=Duel.SelectMatchingCard(
-		tp,s.setfilter,tp,LOCATION_DECK,0,1,1,nil
-	)
+	local g=Duel.SelectMatchingCard(tp,s.setfilter,tp,LOCATION_DECK,0,1,1,nil)
 	if #g>0 then
 		Duel.SSet(tp,g:GetFirst())
 		Duel.ConfirmCards(1-tp,g)

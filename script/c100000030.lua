@@ -1,25 +1,28 @@
 --Freya, Lady of the Aesir
 local s,id=GetID()
 function s.initial_effect(c)
-	--Synchro Summon
+	-- Synchro Summon
 	aux.AddSynchroProcedure(c,s.tfilter,aux.NonTuner(nil),2)
 	c:EnableReviveLimit()
 
-	--① Negate activation (Quick)
+	-------------------------------------------------
+	-- ① Negate activation during Main Phase (Quick Effect, HOPT)
+	-------------------------------------------------
 	local e1=Effect.CreateEffect(c)
 	e1:SetDescription(aux.Stringid(id,0))
-	e1:SetCategory(CATEGORY_NEGATE)
+	e1:SetCategory(CATEGORY_NEGATE+CATEGORY_DESTROY)
 	e1:SetType(EFFECT_TYPE_QUICK_O)
 	e1:SetCode(EVENT_CHAINING)
 	e1:SetRange(LOCATION_MZONE)
-	e1:SetProperty(EFFECT_FLAG_DAMAGE_STEP+EFFECT_FLAG_DAMAGE_CAL)
 	e1:SetCountLimit(1)
 	e1:SetCondition(s.negcon)
 	e1:SetTarget(s.negtg)
 	e1:SetOperation(s.negop)
 	c:RegisterEffect(e1)
 
-	--② Register destruction
+	-------------------------------------------------
+	-- ② Track if destroyed by opponent this turn (internal tracking remains)
+	-------------------------------------------------
 	local e2=Effect.CreateEffect(c)
 	e2:SetType(EFFECT_TYPE_SINGLE+EFFECT_TYPE_CONTINUOUS)
 	e2:SetProperty(EFFECT_FLAG_CANNOT_DISABLE)
@@ -27,7 +30,9 @@ function s.initial_effect(c)
 	e2:SetOperation(s.regop)
 	c:RegisterEffect(e2)
 
-	--③ End Phase Revival
+	-------------------------------------------------
+	-- ③ End Phase Self-Revival (HOPT)
+	-------------------------------------------------
 	local e3=Effect.CreateEffect(c)
 	e3:SetDescription(aux.Stringid(id,1))
 	e3:SetCategory(CATEGORY_SPECIAL_SUMMON)
@@ -41,7 +46,9 @@ function s.initial_effect(c)
 	e3:SetOperation(s.spop)
 	c:RegisterEffect(e3)
 
-	--④ Send 1 from Deck to GY
+	-------------------------------------------------
+	-- ④ When Summoned this way: send 1 card from Deck to GY
+	-------------------------------------------------
 	local e4=Effect.CreateEffect(c)
 	e4:SetDescription(aux.Stringid(id,2))
 	e4:SetCategory(CATEGORY_TOGRAVE)
@@ -54,14 +61,14 @@ function s.initial_effect(c)
 end
 
 -------------------------------------------------
--- Synchro material
+-- Synchro material filter
 -------------------------------------------------
 function s.tfilter(c)
 	return c:IsSetCard(0x3042) or c:IsHasEffect(61777313)
 end
 
 -------------------------------------------------
---① Negate
+-- ① Negate condition
 -------------------------------------------------
 function s.negcon(e,tp,eg,ep,ev,re,r,rp)
 	local ph=Duel.GetCurrentPhase()
@@ -71,30 +78,37 @@ end
 
 function s.negtg(e,tp,eg,ep,ev,re,r,rp,chk)
 	if chk==0 then return true end
-	Duel.SetChainLimit(aux.FALSE)
+	Duel.SetChainLimit(aux.FALSE)  -- No pueden encadenar
 	Duel.SetOperationInfo(0,CATEGORY_NEGATE,eg,1,0,0)
+	if re:GetHandler():IsDestructable() and re:GetHandler():IsRelateToEffect(re) then
+		Duel.SetOperationInfo(0,CATEGORY_DESTROY,eg,1,0,0)
+	end
 end
 
 function s.negop(e,tp,eg,ep,ev,re,r,rp)
-	Duel.NegateActivation(ev)
-end
--------------------------------------------------
---② Register destruction by opponent
--------------------------------------------------
-function s.regop(e,tp,eg,ep,ev,re,r,rp)
-	local c=e:GetHandler()
-	local pos=c:GetPreviousPosition()
-	if c:IsReason(REASON_BATTLE) then pos=c:GetBattlePosition() end
-	if rp==1-tp and c:IsPreviousControler(tp)
-		and c:IsReason(REASON_DESTROY)
-		and c:IsPreviousLocation(LOCATION_ONFIELD)
-		and bit.band(pos,POS_FACEUP)~=0 then
-		c:RegisterFlagEffect(id,RESET_EVENT+RESETS_STANDARD+RESET_PHASE+PHASE_END,0,1)
+	if Duel.NegateActivation(ev) then
+		if re:GetHandler():IsRelateToEffect(re) then
+			Duel.Destroy(re:GetHandler(),REASON_EFFECT)
+		end
 	end
 end
 
 -------------------------------------------------
---③ Revival
+-- ② Track destroyed by opponent (se mantiene igual, solo tracking)
+-------------------------------------------------
+function s.regop(e,tp,eg,ep,ev,re,r,rp)
+	local c=e:GetHandler()
+	if rp~=tp
+		and c:IsPreviousControler(tp)
+		and c:IsReason(REASON_DESTROY)
+		and c:IsPreviousLocation(LOCATION_MZONE)
+		and c:IsPreviousPosition(POS_FACEUP) then
+		c:RegisterFlagEffect(id,RESET_PHASE+PHASE_END,0,1)
+	end
+end
+
+-------------------------------------------------
+-- ③ Revival
 -------------------------------------------------
 function s.spcon(e,tp,eg,ep,ev,re,r,rp)
 	return e:GetHandler():GetFlagEffect(id)~=0
@@ -122,13 +136,14 @@ function s.sptg(e,tp,eg,ep,ev,re,r,rp,chk)
 end
 
 function s.spop(e,tp,eg,ep,ev,re,r,rp)
-	if e:GetHandler():IsRelateToEffect(e) then
-		Duel.SpecialSummon(e:GetHandler(),SUMMON_VALUE_SELF,tp,tp,false,false,POS_FACEUP)
+	local c=e:GetHandler()
+	if c:IsRelateToEffect(e) then
+		Duel.SpecialSummon(c,SUMMON_VALUE_SELF,tp,tp,false,false,POS_FACEUP)
 	end
 end
 
 -------------------------------------------------
---④ Send 1 from Deck to GY
+-- ④ Send from Deck to GY
 -------------------------------------------------
 function s.tgcon(e,tp,eg,ep,ev,re,r,rp)
 	return e:GetHandler():GetSummonType()==SUMMON_TYPE_SPECIAL+SUMMON_VALUE_SELF

@@ -1,35 +1,28 @@
--- Sleipnir, Nordic Steed of the Aesir
+--Sleipnir, Nordic Steed of the Aesir
 local s,id=GetID()
 s.listed_series={0x42,0x4b} -- Nordic / Aesir
 
---------------------------------
--- Initialization
---------------------------------
 function s.initial_effect(c)
 	-- Link Summon: 2 Effect Monsters, including a "Nordic"
 	c:EnableReviveLimit()
-	Link.AddProcedure(c,
-		aux.FilterBoolFunctionEx(Card.IsType,TYPE_EFFECT),
-		2,2,
-		s.lcheck
-	)
+	Link.AddProcedure(c,aux.FilterBoolFunctionEx(Card.IsType,TYPE_EFFECT),2,2,s.lcheck)
 
 	-------------------------------------------------
-	-- ① Banish 1 from hand or GY → send Nordic to GY (HOPT)
+	--① Banish 1 → Send 1 Nordic from Deck to GY (HOPT)
 	-------------------------------------------------
 	local e1=Effect.CreateEffect(c)
 	e1:SetDescription(aux.Stringid(id,0))
 	e1:SetCategory(CATEGORY_TOGRAVE)
 	e1:SetType(EFFECT_TYPE_IGNITION)
 	e1:SetRange(LOCATION_MZONE)
-	e1:SetCondition(s.tgcon)
+	e1:SetCountLimit(1,id)
 	e1:SetCost(s.tgcost)
 	e1:SetTarget(s.tgtg)
 	e1:SetOperation(s.tgop)
 	c:RegisterEffect(e1)
 
 	-------------------------------------------------
-	-- ② Opponent's turn (Quick): Tribute → SS + Synchro (HOPT)
+	--② Opponent's turn: Tribute → SS + Synchro (HOPT)
 	-------------------------------------------------
 	local e2=Effect.CreateEffect(c)
 	e2:SetDescription(aux.Stringid(id,1))
@@ -37,6 +30,7 @@ function s.initial_effect(c)
 	e2:SetType(EFFECT_TYPE_QUICK_O)
 	e2:SetCode(EVENT_FREE_CHAIN)
 	e2:SetRange(LOCATION_MZONE)
+	e2:SetCountLimit(1,id+1)
 	e2:SetCondition(s.spcon2)
 	e2:SetCost(s.spcost2)
 	e2:SetTarget(s.sptg2)
@@ -52,41 +46,27 @@ function s.lcheck(g,lc,sumtype,tp)
 end
 
 -------------------------------------------------
--- ① Effect: Send Nordic to GY
+-- ① Send Nordic to GY
 -------------------------------------------------
-function s.tgcon(e,tp)
-	return Duel.GetFlagEffect(tp,id)==0
-end
-
 function s.tgcost(e,tp,eg,ep,ev,re,r,rp,chk)
 	if chk==0 then
-		return Duel.IsExistingMatchingCard(
-			Card.IsAbleToRemoveAsCost,
-			tp,LOCATION_HAND+LOCATION_GRAVE,0,1,nil
-		)
+		return Duel.IsExistingMatchingCard(Card.IsAbleToRemoveAsCost,tp,LOCATION_HAND+LOCATION_GRAVE,0,1,nil)
 	end
 	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_REMOVE)
-	local g=Duel.SelectMatchingCard(
-		tp,Card.IsAbleToRemoveAsCost,
-		tp,LOCATION_HAND+LOCATION_GRAVE,0,1,1,nil
-	)
+	local g=Duel.SelectMatchingCard(tp,Card.IsAbleToRemoveAsCost,tp,LOCATION_HAND+LOCATION_GRAVE,0,1,1,nil)
 	Duel.Remove(g,POS_FACEUP,REASON_COST)
 end
 
 function s.tgfilter(c)
-	return c:IsSetCard(0x42)
-		and c:IsType(TYPE_MONSTER)
-		and c:IsAbleToGrave()
+	return c:IsSetCard(0x42) and c:IsType(TYPE_MONSTER) and c:IsAbleToGrave()
 end
 
 function s.tgtg(e,tp,eg,ep,ev,re,r,rp,chk)
-	return chk==0
-		and Duel.IsExistingMatchingCard(s.tgfilter,tp,LOCATION_DECK,0,1,nil)
+	if chk==0 then return Duel.IsExistingMatchingCard(s.tgfilter,tp,LOCATION_DECK,0,1,nil) end
+	Duel.SetOperationInfo(0,CATEGORY_TOGRAVE,nil,1,tp,LOCATION_DECK)
 end
 
-function s.tgop(e,tp)
-	Duel.RegisterFlagEffect(tp,id,RESET_PHASE+PHASE_END,0,1)
-
+function s.tgop(e,tp,eg,ep,ev,re,r,rp)
 	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_TOGRAVE)
 	local g=Duel.SelectMatchingCard(tp,s.tgfilter,tp,LOCATION_DECK,0,1,1,nil)
 	if #g>0 then
@@ -95,11 +75,10 @@ function s.tgop(e,tp)
 end
 
 -------------------------------------------------
--- ② Effect: Tribute → SS + immediate Synchro
+-- ② Tribute → SS + immediate Synchro
 -------------------------------------------------
 function s.spcon2(e,tp)
 	return Duel.GetTurnPlayer()~=tp
-		and Duel.GetFlagEffect(tp,id+1)==0
 end
 
 function s.spcost2(e,tp,eg,ep,ev,re,r,rp,chk)
@@ -109,29 +88,26 @@ function s.spcost2(e,tp,eg,ep,ev,re,r,rp,chk)
 end
 
 function s.spfilter(c,e,tp)
-	return c:IsSetCard(0x42)
-		and not c:IsType(TYPE_LINK)
+	return c:IsSetCard(0x42) and not c:IsType(TYPE_LINK)
 		and c:IsCanBeSpecialSummoned(e,0,tp,false,false)
+end
+
+function s.aesirfilter(c,tp,mc)
+	return c:IsSetCard(0x4b) and c:IsType(TYPE_SYNCHRO)
+		and c:IsSynchroSummonable(Group.FromCards(mc))
 end
 
 function s.sptg2(e,tp,eg,ep,ev,re,r,rp,chk)
 	if chk==0 then
+		local mc=Duel.GetMatchingGroup(s.spfilter,tp,LOCATION_GRAVE,0,nil,e,tp)
 		return Duel.GetLocationCount(tp,LOCATION_MZONE)>0
-			and Duel.IsExistingMatchingCard(s.spfilter,tp,LOCATION_GRAVE,0,1,nil,e,tp)
-			and Duel.IsExistingMatchingCard(
-				function(c)
-					return c:IsSetCard(0x4b)
-						and c:IsType(TYPE_SYNCHRO)
-				end,
-				tp,LOCATION_EXTRA,0,1,nil
-			)
+			and #mc>0
+			and Duel.IsExistingMatchingCard(function(c) return s.aesirfilter(c,tp,mc:GetFirst()) end,tp,LOCATION_EXTRA,0,1,nil)
 	end
 	Duel.SetOperationInfo(0,CATEGORY_SPECIAL_SUMMON,nil,1,tp,LOCATION_GRAVE)
 end
 
-function s.spop2(e,tp)
-	Duel.RegisterFlagEffect(tp,id+1,RESET_PHASE+PHASE_END,0,1)
-
+function s.spop2(e,tp,eg,ep,ev,re,r,rp)
 	if Duel.GetLocationCount(tp,LOCATION_MZONE)<=0 then return end
 
 	-- Special Summon Nordic
@@ -141,18 +117,10 @@ function s.spop2(e,tp)
 	if not tc then return end
 	if Duel.SpecialSummon(tc,0,tp,tp,false,false,POS_FACEUP)==0 then return end
 
-	-- Immediately after: Synchro Summon Aesir
-	local sg=Duel.GetMatchingGroup(
-		function(c)
-			return c:IsSetCard(0x4b)
-				and c:IsType(TYPE_SYNCHRO)
-				and c:IsSynchroSummonable(nil)
-		end,
-		tp,LOCATION_EXTRA,0,nil
-	)
+	-- Immediately Synchro Summon Aesir
+	local sg=Duel.GetMatchingGroup(s.aesirfilter,tp,LOCATION_EXTRA,0,nil,tp,tc)
 	if #sg==0 then return end
-
 	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_SPSUMMON)
 	local sc=sg:Select(tp,1,1,nil):GetFirst()
-	Duel.SynchroSummon(tp,sc,nil)
+	Duel.SynchroSummon(tp,sc,Group.FromCards(tc))
 end

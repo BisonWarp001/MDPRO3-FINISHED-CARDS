@@ -1,10 +1,10 @@
 local s,id=GetID()
 s.listed_series={0x42,0x4b}
-s.listed_names={1000000040,93483212}
+s.listed_names={100000040,93483212}
 
 function s.initial_effect(c)
 
-	aux.AddCodeList(c,1000000040)
+	aux.AddCodeList(c,100000040)
 	aux.AddCodeList(c,93483212)
 
 	-------------------------------------------------
@@ -16,7 +16,7 @@ function s.initial_effect(c)
 	e1:SetType(EFFECT_TYPE_SINGLE+EFFECT_TYPE_TRIGGER_O)
 	e1:SetProperty(EFFECT_FLAG_DELAY)
 	e1:SetCode(EVENT_SUMMON_SUCCESS)
-	e1:SetCondition(function(e,tp) return Duel.GetFlagEffect(tp,id)==0 end)
+	e1:SetCountLimit(1,100000039)
 	e1:SetTarget(s.settg)
 	e1:SetOperation(s.setop)
 	c:RegisterEffect(e1)
@@ -28,12 +28,12 @@ function s.initial_effect(c)
 	-------------------------------------------------
 	-- ② Reducir Nivel (HOPT #2)
 	-------------------------------------------------
-
 	local e2=Effect.CreateEffect(c)
 	e2:SetDescription(aux.Stringid(id,1))
 	e2:SetCategory(CATEGORY_LVCHANGE)
 	e2:SetType(EFFECT_TYPE_IGNITION)
 	e2:SetRange(LOCATION_MZONE)
+	e2:SetCountLimit(1,100000039+100)
 	e2:SetCondition(s.lvcon)
 	e2:SetTarget(s.lvtg)
 	e2:SetOperation(s.lvop)
@@ -49,6 +49,7 @@ function s.initial_effect(c)
 	e3:SetCode(EVENT_CHAINING)
 	e3:SetRange(LOCATION_MZONE+LOCATION_GRAVE)
 	e3:SetProperty(EFFECT_FLAG_DAMAGE_STEP+EFFECT_FLAG_DAMAGE_CAL)
+	e3:SetCountLimit(1,100000039+200)
 	e3:SetCondition(s.negcon)
 	e3:SetCost(s.negcost)
 	e3:SetTarget(s.negtg)
@@ -61,7 +62,7 @@ end
 -------------------------------------------------
 
 function s.setfilter(c)
-	return c:IsCode(1000000040)
+	return c:IsCode(100000040)
 		and c:IsType(TYPE_FIELD)
 		and c:IsSSetable()
 end
@@ -71,7 +72,6 @@ function s.settg(e,tp,eg,ep,ev,re,r,rp,chk)
 		return Duel.GetLocationCount(tp,LOCATION_SZONE)>0
 		and Duel.IsExistingMatchingCard(s.setfilter,tp,LOCATION_DECK,0,1,nil)
 	end
-	Duel.RegisterFlagEffect(tp,id,RESET_PHASE+PHASE_END,0,1)
 end
 
 function s.setop(e,tp,eg,ep,ev,re,r,rp)
@@ -87,6 +87,7 @@ end
 -------------------------------------------------
 -- ② Reducir Nivel
 -------------------------------------------------
+
 function s.lvcon(e,tp,eg,ep,ev,re,r,rp)
 	return Duel.IsMainPhase()
 end
@@ -95,7 +96,6 @@ function s.lvtg(e,tp,eg,ep,ev,re,r,rp,chk)
 	local c=e:GetHandler()
 	if chk==0 then
 		return c:IsLevelAbove(2)
-			and Duel.GetFlagEffect(tp,id+1)==0
 	end
 	Duel.SetOperationInfo(0,CATEGORY_LVCHANGE,c,1,0,0)
 end
@@ -104,8 +104,6 @@ function s.lvop(e,tp,eg,ep,ev,re,r,rp)
 	local c=e:GetHandler()
 	if c:IsFacedown() or not c:IsRelateToEffect(e) or c:IsImmuneToEffect(e) then return end
 
-	Duel.RegisterFlagEffect(tp,id+1,RESET_PHASE+PHASE_END,0,1)
-
 	local e1=Effect.CreateEffect(c)
 	e1:SetType(EFFECT_TYPE_SINGLE)
 	e1:SetCode(EFFECT_UPDATE_LEVEL)
@@ -113,8 +111,9 @@ function s.lvop(e,tp,eg,ep,ev,re,r,rp)
 	e1:SetReset(RESET_EVENT+RESETS_STANDARD+RESET_PHASE+PHASE_END)
 	c:RegisterEffect(e1)
 end
+
 -------------------------------------------------
--- ③ Negación correcta
+-- ③ Negación
 -------------------------------------------------
 
 function s.odinfilter(c)
@@ -123,7 +122,6 @@ end
 
 function s.negcon(e,tp,eg,ep,ev,re,r,rp)
 	if rp==tp then return false end
-	if Duel.GetFlagEffect(tp,id+2)>0 then return false end
 	if not Duel.IsExistingMatchingCard(s.odinfilter,tp,LOCATION_MZONE,0,1,nil) then return false end
 	if not re:IsActiveType(TYPE_MONSTER+TYPE_SPELL+TYPE_TRAP) then return false end
 	if not Duel.IsChainDisablable(ev) then return false end
@@ -134,13 +132,8 @@ function s.negcost(e,tp,eg,ep,ev,re,r,rp,chk)
 	local c=e:GetHandler()
 	if chk==0 then return c:IsAbleToRemoveAsCost() end
 	
-	-- HOPT global
-	Duel.RegisterFlagEffect(tp,id+2,RESET_PHASE+PHASE_END,0,1)
-	
-	-- Remover como costo
 	Duel.Remove(c,POS_FACEUP,REASON_COST)
 
-	-- Efecto diferido para regresar en End Phase
 	local e1=Effect.CreateEffect(c)
 	e1:SetType(EFFECT_TYPE_FIELD+EFFECT_TYPE_CONTINUOUS)
 	e1:SetCode(EVENT_PHASE+PHASE_END)
@@ -150,6 +143,7 @@ function s.negcost(e,tp,eg,ep,ev,re,r,rp,chk)
 	e1:SetOperation(s.retop)
 	Duel.RegisterEffect(e1,tp)
 end
+
 function s.retop(e,tp,eg,ep,ev,re,r,rp)
 	local c=e:GetLabelObject()
 	if c and c:IsLocation(LOCATION_REMOVED) then
@@ -159,7 +153,6 @@ end
 
 function s.negtg(e,tp,eg,ep,ev,re,r,rp,chk)
 	if chk==0 then return true end
-	Duel.RegisterFlagEffect(tp,id+2,RESET_PHASE+PHASE_END,0,1)
 	Duel.SetOperationInfo(0,CATEGORY_NEGATE,eg,1,0,0)
 	Duel.SetOperationInfo(0,CATEGORY_DESTROY,eg,1,0,0)
 end

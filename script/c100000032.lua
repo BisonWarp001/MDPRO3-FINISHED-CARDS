@@ -17,7 +17,7 @@ function s.initial_effect(c)
 	e1:SetType(EFFECT_TYPE_SINGLE+EFFECT_TYPE_TRIGGER_O)
 	e1:SetCode(EVENT_SPSUMMON_SUCCESS)
 	e1:SetProperty(EFFECT_FLAG_DELAY)
-	e1:SetCountLimit(1)
+	e1:SetCountLimit(1,id) -- HOPT
 	e1:SetCondition(s.bounce_con)
 	e1:SetTarget(s.bounce_tg)
 	e1:SetOperation(s.bounce_op)
@@ -32,7 +32,7 @@ function s.initial_effect(c)
 	e2:SetType(EFFECT_TYPE_FIELD+EFFECT_TYPE_TRIGGER_O)
 	e2:SetCode(EVENT_SPSUMMON_SUCCESS)
 	e2:SetRange(LOCATION_MZONE)
-	e2:SetCountLimit(1)
+	e2:SetCountLimit(1,id) -- HOPT
 	e2:SetCondition(s.draw_con)
 	e2:SetTarget(s.draw_tg)
 	e2:SetOperation(s.draw_op)
@@ -56,20 +56,23 @@ function s.initial_effect(c)
 	e4:SetType(EFFECT_TYPE_FIELD+EFFECT_TYPE_TRIGGER_O)
 	e4:SetCode(EVENT_PHASE+PHASE_END)
 	e4:SetRange(LOCATION_GRAVE)
-	e4:SetCountLimit(1)
+	e4:SetCountLimit(1,id) -- HOPT
 	e4:SetCondition(s.set_con)
 	e4:SetTarget(s.set_tg)
 	e4:SetOperation(s.set_op)
 	c:RegisterEffect(e4)
 end
 
-------------------------------------------------
--- Synchro material filter (PATTERN FREYA)
-------------------------------------------------
+-------------------------------------------------
+-- Synchro material filter
+-------------------------------------------------
 function s.tfilter(c)
-	return c:IsSetCard(0x42)
+	if not c:IsType(TYPE_TUNER) then return false end
+	return c:IsSetCard(0x3042)
+		or c:IsSetCard(0x6042)
+		or c:IsSetCard(0xA042)
+		or c:IsHasEffect(61777313)
 end
-
 ------------------------------------------------
 --① Bounce
 ------------------------------------------------

@@ -1,24 +1,26 @@
 -- Odinson of the Nordic Beasts
-local s,id=GetID() -- id será 1000000038
+local s,id=GetID()
+
 function s.initial_effect(c)
 
-	aux.AddCodeList(c,30604579) -- referencia a Thor, Lord of the Aesir
+	aux.AddCodeList(c,30604579)
 
 	-------------------------------------------------
-	-- Special Summon from hand (HOPT global)
+	-- Special Summon from hand
 	-------------------------------------------------
 	local e1=Effect.CreateEffect(c)
 	e1:SetDescription(aux.Stringid(id,0))
 	e1:SetCategory(CATEGORY_SPECIAL_SUMMON)
 	e1:SetType(EFFECT_TYPE_IGNITION)
 	e1:SetRange(LOCATION_HAND)
+	e1:SetCountLimit(1,100000038)
 	e1:SetCondition(s.spcon)
 	e1:SetTarget(s.sptg)
 	e1:SetOperation(s.spop)
 	c:RegisterEffect(e1)
 
 	-------------------------------------------------
-	-- Special Summon 1 Nordic from Deck (HOPT global)
+	-- Special Summon 1 Nordic from Deck
 	-------------------------------------------------
 	local e2=Effect.CreateEffect(c)
 	e2:SetDescription(aux.Stringid(id,1))
@@ -26,6 +28,7 @@ function s.initial_effect(c)
 	e2:SetType(EFFECT_TYPE_SINGLE+EFFECT_TYPE_TRIGGER_O)
 	e2:SetProperty(EFFECT_FLAG_DELAY)
 	e2:SetCode(EVENT_SUMMON_SUCCESS)
+	e2:SetCountLimit(1,100000038+100)
 	e2:SetTarget(s.sstg)
 	e2:SetOperation(s.ssop)
 	c:RegisterEffect(e2)
@@ -35,7 +38,7 @@ function s.initial_effect(c)
 	c:RegisterEffect(e3)
 
 	-------------------------------------------------
-	-- Negate monster effect (HOPT global)
+	-- Negate monster effect
 	-------------------------------------------------
 	local e4=Effect.CreateEffect(c)
 	e4:SetDescription(aux.Stringid(id,2))
@@ -43,6 +46,7 @@ function s.initial_effect(c)
 	e4:SetType(EFFECT_TYPE_QUICK_O)
 	e4:SetCode(EVENT_CHAINING)
 	e4:SetRange(LOCATION_MZONE+LOCATION_GRAVE)
+	e4:SetCountLimit(1,100000038+200)
 	e4:SetCondition(s.negcon)
 	e4:SetCost(s.negcost)
 	e4:SetTarget(s.negtg)
@@ -51,24 +55,25 @@ function s.initial_effect(c)
 end
 
 -------------------------------------------------
--- Special Summon from hand
+-- Shared Nordic/Aesir filter
 -------------------------------------------------
 function s.cfilter(c)
 	return c:IsFaceup() and (c:IsSetCard(0x42) or c:IsSetCard(0x4b))
 end
 
+-------------------------------------------------
+-- Special Summon from hand
+-------------------------------------------------
 function s.spcon(e,tp,eg,ep,ev,re,r,rp)
-    return Duel.IsExistingMatchingCard(s.cfilter,tp,LOCATION_MZONE,0,1,nil)
-        and Duel.GetFlagEffect(tp,id+100)==0 -- HOPT global
+	return Duel.IsExistingMatchingCard(s.cfilter,tp,LOCATION_MZONE,0,1,nil)
 end
+
 function s.sptg(e,tp,eg,ep,ev,re,r,rp,chk)
 	local c=e:GetHandler()
 	if chk==0 then
 		return Duel.GetLocationCount(tp,LOCATION_MZONE)>0
 			and c:IsCanBeSpecialSummoned(e,0,tp,false,false)
 	end
-	-- Registrar HOPT manual
-	Duel.RegisterFlagEffect(tp,id+100,RESET_PHASE+PHASE_END,0,1)
 	Duel.SetOperationInfo(0,CATEGORY_SPECIAL_SUMMON,c,1,0,0)
 end
 
@@ -88,11 +93,9 @@ end
 
 function s.sstg(e,tp,eg,ep,ev,re,r,rp,chk)
 	if chk==0 then
-		return Duel.GetFlagEffect(tp,id+1000)==0
-			and Duel.GetLocationCount(tp,LOCATION_MZONE)>0
+		return Duel.GetLocationCount(tp,LOCATION_MZONE)>0
 			and Duel.IsExistingMatchingCard(s.ssfilter,tp,LOCATION_DECK,0,1,nil,e,tp)
 	end
-	Duel.RegisterFlagEffect(tp,id+1000,RESET_PHASE+PHASE_END,0,1) -- HOPT global
 	Duel.SetOperationInfo(0,CATEGORY_SPECIAL_SUMMON,nil,1,tp,LOCATION_DECK)
 end
 
@@ -117,20 +120,14 @@ function s.negcon(e,tp,eg,ep,ev,re,r,rp)
 		and re:IsActiveType(TYPE_MONSTER)
 		and Duel.IsExistingMatchingCard(s.thorfilter,tp,LOCATION_MZONE,0,1,nil)
 		and Duel.IsChainNegatable(ev)
-		and Duel.GetFlagEffect(tp,id+2000)==0 -- HOPT global
 end
 
 function s.negcost(e,tp,eg,ep,ev,re,r,rp,chk)
 	local c=e:GetHandler()
 	if chk==0 then return c:IsAbleToRemoveAsCost() end
 
-	-- HOPT global
-	Duel.RegisterFlagEffect(tp,id+2000,RESET_PHASE+PHASE_END,0,1)
-
-	-- Remover como costo
 	Duel.Remove(c,POS_FACEUP,REASON_COST)
 
-	-- Efecto diferido para regresar en End Phase
 	local e1=Effect.CreateEffect(c)
 	e1:SetType(EFFECT_TYPE_FIELD+EFFECT_TYPE_CONTINUOUS)
 	e1:SetCode(EVENT_PHASE+PHASE_END)
@@ -140,6 +137,7 @@ function s.negcost(e,tp,eg,ep,ev,re,r,rp,chk)
 	e1:SetOperation(s.retop)
 	Duel.RegisterEffect(e1,tp)
 end
+
 function s.retop(e,tp,eg,ep,ev,re,r,rp)
 	local c=e:GetLabelObject()
 	if c and c:IsLocation(LOCATION_REMOVED) then

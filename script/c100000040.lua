@@ -134,10 +134,10 @@ function s.spop3(e,tp,eg,ep,ev,re,r,rp)
 	if Duel.GetLocationCount(tp,LOCATION_MZONE)<=0 then return end
 
 	if not Duel.IsPlayerCanSpecialSummonMonster(
-		tp,1000000041,0,TYPE_TOKEN+TYPE_MONSTER,
+		tp,100000041,0,TYPE_TOKEN+TYPE_MONSTER,
 		1000,1000,2,RACE_WARRIOR,ATTRIBUTE_LIGHT
 	) then return end
 
-	local token=Duel.CreateToken(tp,1000000041)
+	local token=Duel.CreateToken(tp,100000041)
 	Duel.SpecialSummon(token,0,tp,tp,false,false,POS_FACEUP_DEFENSE)
 end

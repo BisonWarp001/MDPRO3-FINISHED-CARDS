@@ -18,6 +18,7 @@ function s.initial_effect(c)
 	e1:SetType(EFFECT_TYPE_QUICK_O)
 	e1:SetCode(EVENT_FREE_CHAIN)
 	e1:SetRange(LOCATION_SZONE)
+	e1:SetCountLimit(1,id)
 	e1:SetCondition(s.sccon)
 	e1:SetTarget(s.sctg)
 	e1:SetOperation(s.scop)
@@ -31,6 +32,7 @@ function s.initial_effect(c)
 	e2:SetType(EFFECT_TYPE_QUICK_O)
 	e2:SetCode(EVENT_FREE_CHAIN)
 	e2:SetRange(LOCATION_SZONE+LOCATION_GRAVE)
+	e2:SetCountLimit(1,id+1)
 	e2:SetCondition(s.descon2)
 	e2:SetTarget(s.destg2)
 	e2:SetOperation(s.desop2)
@@ -38,16 +40,14 @@ function s.initial_effect(c)
 end
 
 ------------------------------------------------
--- HOPT conditions
+-- Conditions
 ------------------------------------------------
 function s.sccon(e,tp)
-	return Duel.GetFlagEffect(tp,id)==0
-		and not Duel.IsExistingMatchingCard(s.aesirfilter,tp,LOCATION_MZONE,0,1,nil)
+	return not Duel.IsExistingMatchingCard(s.aesirfilter,tp,LOCATION_MZONE,0,1,nil)
 end
 
 function s.descon2(e,tp)
-	return Duel.GetFlagEffect(tp,id+1)==0
-		and Duel.IsExistingMatchingCard(s.aesirfilter,tp,LOCATION_MZONE,0,1,nil)
+	return Duel.IsExistingMatchingCard(s.aesirfilter,tp,LOCATION_MZONE,0,1,nil)
 end
 
 function s.aesirfilter(c)
@@ -85,8 +85,6 @@ function s.scop(e,tp,eg,ep,ev,re,r,rp)
 	end
 
 	if Duel.Remove(rg,POS_FACEUP,REASON_EFFECT)==0 then return end
-
-	Duel.RegisterFlagEffect(tp,id,RESET_PHASE+PHASE_END,0,1)
 
 	Duel.BreakEffect()
 
@@ -132,8 +130,6 @@ end
 function s.desop2(e,tp,eg,ep,ev,re,r,rp)
 	local c=e:GetHandler()
 	if Duel.Remove(c,POS_FACEUP,REASON_EFFECT)==0 then return end
-
-	Duel.RegisterFlagEffect(tp,id+1,RESET_PHASE+PHASE_END,0,1)
 
 	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_DESTROY)
 	local g=Duel.SelectMatchingCard(tp,aux.TRUE,tp,0,LOCATION_ONFIELD,1,1,nil)

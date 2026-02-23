@@ -1,5 +1,6 @@
 -- Dvalinn of the Nordic Alfar
 local s,id=GetID()
+
 function s.initial_effect(c)
 
 	-------------------------------------------------
@@ -8,30 +9,32 @@ function s.initial_effect(c)
 	local e0=Effect.CreateEffect(c)
 	e0:SetType(EFFECT_TYPE_SINGLE)
 	e0:SetProperty(EFFECT_FLAG_CANNOT_DISABLE+EFFECT_FLAG_UNCOPYABLE)
-	e0:SetCode(61777313) -- Synchro substitute code
+	e0:SetCode(61777313)
 	c:RegisterEffect(e0)
 
 	-------------------------------------------------
-	-- Special Summon from hand (HOPT global)
+	-- Special Summon from hand
 	-------------------------------------------------
 	local e1=Effect.CreateEffect(c)
 	e1:SetDescription(aux.Stringid(id,0))
 	e1:SetCategory(CATEGORY_SPECIAL_SUMMON)
 	e1:SetType(EFFECT_TYPE_IGNITION)
 	e1:SetRange(LOCATION_HAND)
+	e1:SetCountLimit(1,100000036)
 	e1:SetCondition(s.spcon)
 	e1:SetTarget(s.sptg)
 	e1:SetOperation(s.spop)
 	c:RegisterEffect(e1)
 
 	-------------------------------------------------
-	-- Add to hand from GY (HOPT global)
+	-- Add to hand from GY
 	-------------------------------------------------
 	local e2=Effect.CreateEffect(c)
 	e2:SetDescription(aux.Stringid(id,1))
 	e2:SetCategory(CATEGORY_TOHAND)
 	e2:SetType(EFFECT_TYPE_IGNITION)
 	e2:SetRange(LOCATION_GRAVE)
+	e2:SetCountLimit(1,100000036+100)
 	e2:SetCondition(s.thcon)
 	e2:SetTarget(s.thtg)
 	e2:SetOperation(s.thop)
@@ -39,16 +42,18 @@ function s.initial_effect(c)
 end
 
 -------------------------------------------------
--- Special Summon condition
+-- Shared filter
 -------------------------------------------------
 function s.cfilter(c)
-	return c:IsFaceup() and (c:IsSetCard(0x42) or c:IsSetCard(0x4b)) -- cualquier monstruo Nordic o Aesir
+	return c:IsFaceup() and (c:IsSetCard(0x42) or c:IsSetCard(0x4b))
 end
 
+-------------------------------------------------
+-- Special Summon condition
+-------------------------------------------------
 function s.spcon(e,tp,eg,ep,ev,re,r,rp)
-	return (Duel.GetFieldGroupCount(tp,LOCATION_MZONE,0)==0 
-		or Duel.IsExistingMatchingCard(s.cfilter,tp,LOCATION_MZONE,0,1,nil))
-		and Duel.GetFlagEffect(tp,id)==0 -- HOPT global
+	return Duel.GetFieldGroupCount(tp,LOCATION_MZONE,0)==0 
+		or Duel.IsExistingMatchingCard(s.cfilter,tp,LOCATION_MZONE,0,1,nil)
 end
 
 -------------------------------------------------
@@ -60,8 +65,6 @@ function s.sptg(e,tp,eg,ep,ev,re,r,rp,chk)
 		return Duel.GetLocationCount(tp,LOCATION_MZONE)>0
 			and c:IsCanBeSpecialSummoned(e,0,tp,false,false)
 	end
-	-- Registrar HOPT global
-	Duel.RegisterFlagEffect(tp,id,RESET_PHASE+PHASE_END,0,1)
 	Duel.SetOperationInfo(0,CATEGORY_SPECIAL_SUMMON,c,1,0,0)
 end
 
@@ -72,11 +75,10 @@ function s.spop(e,tp,eg,ep,ev,re,r,rp)
 end
 
 -------------------------------------------------
--- Add to hand from GY (HOPT global)
+-- Add to hand from GY
 -------------------------------------------------
 function s.thcon(e,tp,eg,ep,ev,re,r,rp)
 	return Duel.IsExistingMatchingCard(s.cfilter,tp,LOCATION_MZONE,0,1,nil)
-		and Duel.GetFlagEffect(tp,id+1)==0 -- HOPT global
 end
 
 function s.thfilter(c)
@@ -90,7 +92,6 @@ function s.thtg(e,tp,eg,ep,ev,re,r,rp,chk)
 			and (Duel.IsExistingMatchingCard(Card.IsDiscardable,tp,LOCATION_HAND,0,1,nil)
 				or Duel.IsExistingMatchingCard(s.thfilter,tp,LOCATION_GRAVE,0,1,nil))
 	end
-	Duel.RegisterFlagEffect(tp,id+1,RESET_PHASE+PHASE_END,0,1) -- HOPT global
 	Duel.SetOperationInfo(0,CATEGORY_TOHAND,c,1,0,0)
 end
 

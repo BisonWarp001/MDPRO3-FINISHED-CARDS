@@ -13,7 +13,7 @@ function s.initial_effect(c)
 	e1:SetType(EFFECT_TYPE_ACTIVATE)
 	e1:SetCode(EVENT_FREE_CHAIN)
 	e1:SetProperty(EFFECT_FLAG_CARD_TARGET)
-	e1:SetCondition(s.spcon)
+	e1:SetCountLimit(1,id)
 	e1:SetTarget(s.sptg)
 	e1:SetOperation(s.spop)
 	c:RegisterEffect(e1)
@@ -39,6 +39,7 @@ function s.initial_effect(c)
 	e3:SetType(EFFECT_TYPE_SINGLE+EFFECT_TYPE_TRIGGER_O)
 	e3:SetCode(EVENT_TO_GRAVE)
 	e3:SetProperty(EFFECT_FLAG_DELAY)
+	e3:SetCountLimit(1,id+1)
 	e3:SetCondition(s.thcon)
 	e3:SetTarget(s.thtg)
 	e3:SetOperation(s.thop)
@@ -46,14 +47,7 @@ function s.initial_effect(c)
 end
 
 ------------------------------------------------
--- ① HOPT condition
-------------------------------------------------
-function s.spcon(e,tp)
-	return Duel.GetFlagEffect(tp,id)==0
-end
-
-------------------------------------------------
--- Special Summon target
+-- ① Special Summon target
 ------------------------------------------------
 function s.spfilter(c,e,tp)
 	return c:IsType(TYPE_MONSTER)
@@ -84,8 +78,6 @@ function s.spop(e,tp,eg,ep,ev,re,r,rp)
 	if Duel.SpecialSummon(tc,0,tp,tp,true,true,POS_FACEUP)==0 then return end
 	Duel.Equip(tp,c,tc)
 
-	Duel.RegisterFlagEffect(tp,id,RESET_PHASE+PHASE_END,0,1)
-
 	local e1=Effect.CreateEffect(c)
 	e1:SetType(EFFECT_TYPE_SINGLE)
 	e1:SetCode(EFFECT_EQUIP_LIMIT)
@@ -113,13 +105,12 @@ function s.aclimit(e,re,tp)
 end
 
 ------------------------------------------------
--- ③ Search condition (HOPT en condición)
+-- ③ Search condition
 ------------------------------------------------
 function s.thcon(e,tp,eg,ep,ev,re,r,rp)
 	local c=e:GetHandler()
 	local ec=c:GetPreviousEquipTarget()
-	return Duel.GetFlagEffect(tp,id+1)==0
-		and c:IsPreviousLocation(LOCATION_ONFIELD)
+	return c:IsPreviousLocation(LOCATION_ONFIELD)
 		and ec and ec:IsSetCard(0x4b)
 end
 
@@ -138,8 +129,6 @@ function s.thtg(e,tp,eg,ep,ev,re,r,rp,chk)
 end
 
 function s.thop(e,tp,eg,ep,ev,re,r,rp)
-	Duel.RegisterFlagEffect(tp,id+1,RESET_PHASE+PHASE_END,0,1)
-
 	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_ATOHAND)
 	local g=Duel.SelectMatchingCard(tp,s.thfilter,tp,LOCATION_DECK,0,1,1,nil)
 	if #g>0 then
