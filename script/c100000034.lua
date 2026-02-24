@@ -1,14 +1,13 @@
---Sleipnir, Nordic Steed of the Aesir
+-- Sleipnir, Nordic Steed of the Aesir
 local s,id=GetID()
-s.listed_series={0x42,0x4b} -- Nordic / Aesir
+s.listed_series={0x42,0x4b}
 
 function s.initial_effect(c)
-	-- Link Summon: 2 Effect Monsters, including a "Nordic"
 	c:EnableReviveLimit()
-	Link.AddProcedure(c,aux.FilterBoolFunctionEx(Card.IsType,TYPE_EFFECT),2,2,s.lcheck)
+	aux.AddLinkProcedure(c,aux.FilterBoolFunction(Card.IsType,TYPE_EFFECT),2,2,s.lcheck)
 
 	-------------------------------------------------
-	--① Banish 1 → Send 1 Nordic from Deck to GY (HOPT)
+	--① Banish 1 → Send 1 Nordic (HOPT)
 	-------------------------------------------------
 	local e1=Effect.CreateEffect(c)
 	e1:SetDescription(aux.Stringid(id,0))
@@ -22,7 +21,7 @@ function s.initial_effect(c)
 	c:RegisterEffect(e1)
 
 	-------------------------------------------------
-	--② Opponent's turn: Tribute → SS + Synchro (HOPT)
+	--② Opponent turn: Tribute → SS + Synchro (HOPT)
 	-------------------------------------------------
 	local e2=Effect.CreateEffect(c)
 	e2:SetDescription(aux.Stringid(id,1))
@@ -39,14 +38,14 @@ function s.initial_effect(c)
 end
 
 --------------------------------
--- Link material check
+-- Link must include 1 Nordic
 --------------------------------
 function s.lcheck(g,lc,sumtype,tp)
 	return g:IsExists(Card.IsSetCard,1,nil,0x42)
 end
 
 -------------------------------------------------
--- ① Send Nordic to GY
+-- ① Send Nordic
 -------------------------------------------------
 function s.tgcost(e,tp,eg,ep,ev,re,r,rp,chk)
 	if chk==0 then
@@ -62,7 +61,9 @@ function s.tgfilter(c)
 end
 
 function s.tgtg(e,tp,eg,ep,ev,re,r,rp,chk)
-	if chk==0 then return Duel.IsExistingMatchingCard(s.tgfilter,tp,LOCATION_DECK,0,1,nil) end
+	if chk==0 then
+		return Duel.IsExistingMatchingCard(s.tgfilter,tp,LOCATION_DECK,0,1,nil)
+	end
 	Duel.SetOperationInfo(0,CATEGORY_TOGRAVE,nil,1,tp,LOCATION_DECK)
 end
 
@@ -75,7 +76,7 @@ function s.tgop(e,tp,eg,ep,ev,re,r,rp)
 end
 
 -------------------------------------------------
--- ② Tribute → SS + immediate Synchro
+-- ② Tribute → SS + Synchro
 -------------------------------------------------
 function s.spcon2(e,tp)
 	return Duel.GetTurnPlayer()~=tp
@@ -88,23 +89,23 @@ function s.spcost2(e,tp,eg,ep,ev,re,r,rp,chk)
 end
 
 function s.spfilter(c,e,tp)
-	return c:IsSetCard(0x42) and not c:IsType(TYPE_LINK)
+	return c:IsSetCard(0x42)
+		and not c:IsType(TYPE_LINK)
 		and c:IsCanBeSpecialSummoned(e,0,tp,false,false)
-end
-
-function s.aesirfilter(c,tp,mc)
-	return c:IsSetCard(0x4b) and c:IsType(TYPE_SYNCHRO)
-		and c:IsSynchroSummonable(Group.FromCards(mc))
 end
 
 function s.sptg2(e,tp,eg,ep,ev,re,r,rp,chk)
 	if chk==0 then
-		local mc=Duel.GetMatchingGroup(s.spfilter,tp,LOCATION_GRAVE,0,nil,e,tp)
 		return Duel.GetLocationCount(tp,LOCATION_MZONE)>0
-			and #mc>0
-			and Duel.IsExistingMatchingCard(function(c) return s.aesirfilter(c,tp,mc:GetFirst()) end,tp,LOCATION_EXTRA,0,1,nil)
+			and Duel.IsExistingMatchingCard(s.spfilter,tp,LOCATION_GRAVE,0,1,nil,e,tp)
 	end
 	Duel.SetOperationInfo(0,CATEGORY_SPECIAL_SUMMON,nil,1,tp,LOCATION_GRAVE)
+end
+
+function s.aesirfilter(c,e,tp,mc)
+	return c:IsSetCard(0x4b)
+		and c:IsType(TYPE_SYNCHRO)
+		and c:IsSynchroSummonable(mc)
 end
 
 function s.spop2(e,tp,eg,ep,ev,re,r,rp)
@@ -117,10 +118,14 @@ function s.spop2(e,tp,eg,ep,ev,re,r,rp)
 	if not tc then return end
 	if Duel.SpecialSummon(tc,0,tp,tp,false,false,POS_FACEUP)==0 then return end
 
-	-- Immediately Synchro Summon Aesir
-	local sg=Duel.GetMatchingGroup(s.aesirfilter,tp,LOCATION_EXTRA,0,nil,tp,tc)
-	if #sg==0 then return end
-	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_SPSUMMON)
-	local sc=sg:Select(tp,1,1,nil):GetFirst()
-	Duel.SynchroSummon(tp,sc,Group.FromCards(tc))
+	-- Gather materials on field AFTER summon resolves
+	local mg=Duel.GetMatchingGroup(Card.IsFaceup,tp,LOCATION_MZONE,0,nil)
+
+	-- Check Aesir Synchro
+	local sg=Duel.GetMatchingGroup(Card.IsSynchroSummonable,tp,LOCATION_EXTRA,0,nil,nil,mg)
+	if #sg>0 then
+		Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_SPSUMMON)
+		local sc=sg:Select(tp,1,1,nil):GetFirst()
+		Duel.SynchroSummon(tp,sc,nil,mg)
+	end
 end
