@@ -2,7 +2,7 @@
 local s,id=GetID()
 function s.initial_effect(c)
 	-- Xyz Summon
-	Xyz.AddProcedure(c,nil,10,2)
+	aux.AddXyzProcedure(c,nil,10,2)
 	c:EnableReviveLimit()
 
 	--------------------------------
@@ -41,7 +41,7 @@ function s.initial_effect(c)
 	c:RegisterEffect(e3)
 
 	--------------------------------
-	--④ HOPT: End Phase revival
+	--④ SOPT: End Phase revival
 	--------------------------------
 	local e4=Effect.CreateEffect(c)
 	e4:SetDescription(aux.Stringid(id,1))
@@ -49,7 +49,7 @@ function s.initial_effect(c)
 	e4:SetType(EFFECT_TYPE_FIELD+EFFECT_TYPE_TRIGGER_O)
 	e4:SetCode(EVENT_PHASE+PHASE_END)
 	e4:SetRange(LOCATION_GRAVE)
-	e4:SetCountLimit(1)
+	e4:SetCountLimit(1) -- SOPT, no ID
 	e4:SetCondition(s.revcon)
 	e4:SetCost(s.revcost)
 	e4:SetTarget(s.revtg)
@@ -100,6 +100,7 @@ function s.spop(e,tp,eg,ep,ev,re,r,rp)
 	local g=Duel.SelectMatchingCard(tp,s.spfilter,tp,LOCATION_GRAVE,0,1,1,nil,e,tp)
 	local tc=g:GetFirst()
 	if tc and Duel.SpecialSummon(tc,0,tp,tp,false,false,POS_FACEUP_ATTACK)~=0 then
+		-- Must attack & cannot change battle position
 		local e1=Effect.CreateEffect(e:GetHandler())
 		e1:SetType(EFFECT_TYPE_SINGLE)
 		e1:SetCode(EFFECT_MUST_ATTACK)
