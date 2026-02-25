@@ -94,28 +94,34 @@ function s.negop(e,tp,eg,ep,ev,re,r,rp)
 end
 
 -------------------------------------------------
--- ② Track destroyed by opponent (se mantiene igual, solo tracking)
+-- ② Track destroyed (IDENTICAL TO ODIN)
 -------------------------------------------------
 function s.regop(e,tp,eg,ep,ev,re,r,rp)
 	local c=e:GetHandler()
-	if rp~=tp
+	local pos=c:GetPreviousPosition()
+	if c:IsReason(REASON_BATTLE) then
+		pos=c:GetBattlePosition()
+	end
+	if rp==1-tp
 		and c:IsPreviousControler(tp)
 		and c:IsReason(REASON_DESTROY)
-		and c:IsPreviousLocation(LOCATION_MZONE)
-		and c:IsPreviousPosition(POS_FACEUP) then
-		c:RegisterFlagEffect(id,RESET_PHASE+PHASE_END,0,1)
+		and c:IsPreviousLocation(LOCATION_ONFIELD)
+		and bit.band(pos,POS_FACEUP)~=0 then
+		c:RegisterFlagEffect(id,RESET_EVENT+RESETS_STANDARD+RESET_PHASE+PHASE_END,0,1)
 	end
 end
 
 -------------------------------------------------
--- ③ Revival
+-- ③ End Phase Self-Revival (IDENTICAL TO ODIN)
 -------------------------------------------------
 function s.spcon(e,tp,eg,ep,ev,re,r,rp)
 	return e:GetHandler():GetFlagEffect(id)~=0
 end
 
 function s.cfilter(c)
-	return c:IsSetCard(0x3042) and c:IsType(TYPE_TUNER) and c:IsAbleToRemoveAsCost()
+	return c:IsSetCard(0x3042)
+		and c:IsType(TYPE_TUNER)
+		and c:IsAbleToRemoveAsCost()
 end
 
 function s.spcost(e,tp,eg,ep,ev,re,r,rp,chk)
@@ -136,14 +142,13 @@ function s.sptg(e,tp,eg,ep,ev,re,r,rp,chk)
 end
 
 function s.spop(e,tp,eg,ep,ev,re,r,rp)
-	local c=e:GetHandler()
-	if c:IsRelateToEffect(e) then
-		Duel.SpecialSummon(c,SUMMON_VALUE_SELF,tp,tp,false,false,POS_FACEUP)
+	if e:GetHandler():IsRelateToEffect(e) then
+		Duel.SpecialSummon(e:GetHandler(),SUMMON_VALUE_SELF,tp,tp,false,false,POS_FACEUP)
 	end
 end
 
 -------------------------------------------------
--- ④ Send from Deck to GY
+-- ④ When Summoned this way (IDENTICAL STRUCTURE)
 -------------------------------------------------
 function s.tgcon(e,tp,eg,ep,ev,re,r,rp)
 	return e:GetHandler():GetSummonType()==SUMMON_TYPE_SPECIAL+SUMMON_VALUE_SELF
