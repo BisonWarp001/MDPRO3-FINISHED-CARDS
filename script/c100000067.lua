@@ -4,17 +4,17 @@ local s,id=GetID()
 function s.initial_effect(c)
 
 	--------------------------------
-	-- You can only control 1
+	-- Solo puedes controlar 1
 	--------------------------------
 	c:SetUniqueOnField(1,0,id)
 
 	--------------------------------
-	-- Mention Wicked monsters
+	-- Mencionar monstruos Wicked
 	--------------------------------
 	aux.AddCodeList(c,21208154,62180201,57793869)
 
 	--------------------------------
-	-- Activate
+	-- Activación
 	--------------------------------
 	local e0=Effect.CreateEffect(c)
 	e0:SetType(EFFECT_TYPE_ACTIVATE)
@@ -22,102 +22,83 @@ function s.initial_effect(c)
 	c:RegisterEffect(e0)
 
 	--------------------------------
-	-- Avatar & Eraser unaffected by Dreadroot
+	-- Efectos de inmunidad entre Wicked
 	--------------------------------
 	local e1=Effect.CreateEffect(c)
 	e1:SetType(EFFECT_TYPE_FIELD)
 	e1:SetCode(EFFECT_IMMUNE_EFFECT)
 	e1:SetRange(LOCATION_SZONE)
 	e1:SetTargetRange(LOCATION_MZONE,0)
-	e1:SetTarget(s.immtg1)
-	e1:SetValue(s.immval1)
+	e1:SetTarget(s.immtg)
+	e1:SetValue(s.immval)
 	c:RegisterEffect(e1)
 
 	--------------------------------
-	-- Avatar & Dreadroot unaffected by Eraser
+	-- Si se envía al Cementerio: añadir 1 Wicked
 	--------------------------------
-	local e2=e1:Clone()
-	e2:SetTarget(s.immtg2)
-	e2:SetValue(s.immval2)
+	local e2=Effect.CreateEffect(c)
+	e2:SetDescription(aux.Stringid(id,0))
+	e2:SetCategory(CATEGORY_TOHAND+CATEGORY_SEARCH)
+	e2:SetType(EFFECT_TYPE_SINGLE+EFFECT_TYPE_TRIGGER_O)
+	e2:SetCode(EVENT_TO_GRAVE)
+	e2:SetProperty(EFFECT_FLAG_DELAY)
+	e2:SetCountLimit(1,id)
+	e2:SetTarget(s.thtg)
+	e2:SetOperation(s.thop)
 	c:RegisterEffect(e2)
 
-	--------------------------------
-	-- If sent to GY: Add 1 Wicked monster
-	--------------------------------
-	local e3=Effect.CreateEffect(c)
-	e3:SetDescription(aux.Stringid(id,0))
-	e3:SetCategory(CATEGORY_TOHAND+CATEGORY_SEARCH)
-	e3:SetType(EFFECT_TYPE_SINGLE+EFFECT_TYPE_TRIGGER_O)
-	e3:SetCode(EVENT_TO_GRAVE)
-	e3:SetProperty(EFFECT_FLAG_DELAY)
-	e3:SetCountLimit(1,id)
-	e3:SetTarget(s.thtg)
-	e3:SetOperation(s.thop)
-	c:RegisterEffect(e3)
-
 end
 
 --------------------------------
--- Wicked codes
+-- Lista de códigos Wicked
 --------------------------------
-s.wicked_list={
-	21208154, -- The Wicked Avatar
-	62180201, -- The Wicked Dreadroot
-	57793869  -- The Wicked Eraser
-}
+s.wicked_list={21208154,62180201,57793869}
+
+function s.wicked(c)
+	return c:IsCode(table.unpack(s.wicked_list))
+end
 
 --------------------------------
--- (1) Avatar & Eraser unaffected by Dreadroot
+-- Objetivos de inmunidad
 --------------------------------
-function s.immtg1(e,c)
-	return c:IsFaceup() and c:IsCode(21208154,57793869)
+function s.immtg(e,c)
+	return c:IsFaceup() and s.wicked(c)
 end
-function s.immval1(e,re)
-	local tc=re:GetHandler()
+
+--------------------------------
+-- Valor de inmunidad (no bloquea a sí mismo)
+--------------------------------
+function s.immval(e,re,c)
+	local rc=re:GetHandler()
 	return re:IsActiveType(TYPE_MONSTER)
-		and tc:IsControler(e:GetHandlerPlayer())
-		and tc:IsCode(62180201)
+		and rc:IsControler(c:GetControler())
+		and s.wicked(rc)
+		and rc~=c
 end
 
 --------------------------------
--- (2) Avatar & Dreadroot unaffected by Eraser
---------------------------------
-function s.immtg2(e,c)
-	return c:IsFaceup() and c:IsCode(21208154,62180201)
-end
-function s.immval2(e,re)
-	local tc=re:GetHandler()
-	return re:IsActiveType(TYPE_MONSTER)
-		and tc:IsControler(e:GetHandlerPlayer())
-		and tc:IsCode(57793869)
-end
-
---------------------------------
--- Search filter
+-- Filtro para búsqueda
 --------------------------------
 function s.thfilter(c)
-	return c:IsCode(21208154,62180201,57793869)
-		and c:IsAbleToHand()
+	return s.wicked(c) and c:IsAbleToHand()
 end
 
+--------------------------------
+-- Target de búsqueda
+--------------------------------
 function s.thtg(e,tp,eg,ep,ev,re,r,rp,chk)
 	if chk==0 then
-		return Duel.IsExistingMatchingCard(
-			s.thfilter,tp,LOCATION_DECK+LOCATION_GRAVE,0,1,nil
-		)
+		return Duel.IsExistingMatchingCard(s.thfilter,tp,LOCATION_DECK+LOCATION_GRAVE,0,1,nil)
 	end
-	Duel.SetOperationInfo(
-		0,CATEGORY_TOHAND,nil,1,tp,LOCATION_DECK+LOCATION_GRAVE
-	)
+	Duel.SetOperationInfo(0,CATEGORY_TOHAND,nil,1,tp,LOCATION_DECK+LOCATION_GRAVE)
 end
 
+--------------------------------
+-- Operación de búsqueda
+--------------------------------
 function s.thop(e,tp,eg,ep,ev,re,r,rp)
 	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_ATOHAND)
-	local g=Duel.SelectMatchingCard(
-		tp,
-		aux.NecroValleyFilter(s.thfilter),
-		tp,LOCATION_DECK+LOCATION_GRAVE,0,1,1,nil
-	)
+	local g=Duel.SelectMatchingCard(tp,aux.NecroValleyFilter(s.thfilter),tp,LOCATION_DECK+LOCATION_GRAVE,0,1,1,nil)
 	if #g>0 then
 		Duel.SendtoHand(g,nil,REASON_EFFECT)
 		Duel.ConfirmCards(1-tp,g)

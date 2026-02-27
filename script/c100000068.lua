@@ -27,7 +27,7 @@ function s.initial_effect(c)
 	e2:SetType(EFFECT_TYPE_QUICK_O)
 	e2:SetCode(EVENT_FREE_CHAIN)
 	e2:SetRange(LOCATION_GRAVE)
-	e2:SetCountLimit(1,id+1)
+	e2:SetCountLimit(1,id)
 	e2:SetCondition(s.gycon)
 	e2:SetCost(aux.bfgcost)
 	e2:SetOperation(s.gyop)
@@ -78,7 +78,9 @@ end
 
 function s.gycon(e,tp,eg,ep,ev,re,r,rp)
 	return Duel.IsExistingMatchingCard(
-		function(c) return c:IsFaceup() and c:IsCode(57793869) end,
+		function(c) 
+			return c:IsFaceup() and c:IsCode(57793869) 
+		end,
 		tp,LOCATION_MZONE,0,1,nil
 	)
 end
@@ -108,7 +110,9 @@ end
 -- Mark that Wicked Eraser was destroyed
 function s.markcon(e,tp,eg,ep,ev,re,r,rp)
 	return eg:IsExists(function(c)
-		return c:IsCode(57793869) and c:IsReason(REASON_DESTROY)
+		return c:IsCode(57793869)
+			and c:IsReason(REASON_DESTROY)
+			and c:IsPreviousLocation(LOCATION_MZONE)
 	end,1,nil)
 end
 

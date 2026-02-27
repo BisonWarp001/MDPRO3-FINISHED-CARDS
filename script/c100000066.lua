@@ -2,126 +2,123 @@
 local s,id=GetID()
 
 function s.initial_effect(c)
-	--Activation (cannot be negated)
+	--------------------------------
+	-- Activación (no puede ser negada)
+	--------------------------------
+	local e0=Effect.CreateEffect(c)
+	e0:SetType(EFFECT_TYPE_ACTIVATE)
+	e0:SetCode(EVENT_FREE_CHAIN)
+	e0:SetProperty(EFFECT_FLAG_CANNOT_INACTIVATE+EFFECT_FLAG_CANNOT_DISABLE+EFFECT_FLAG_CAN_FORBIDDEN)
+	c:RegisterEffect(e0)
+
+	--------------------------------
+	-- Mencionar Wicked monsters
+	--------------------------------
+	aux.AddCodeList(c,21208154,62180201,57793869)
+
+	--------------------------------
+	-- Efecto principal: proteger Wicked
+	--------------------------------
 	local e1=Effect.CreateEffect(c)
-	e1:SetType(EFFECT_TYPE_ACTIVATE)
-	e1:SetCode(EVENT_FREE_CHAIN)
-	e1:SetProperty(EFFECT_FLAG_CANNOT_DISABLE+EFFECT_FLAG_CANNOT_NEGATE+EFFECT_FLAG_CANNOT_INACTIVATE)
-	e1:SetCountLimit(1,id+EFFECT_COUNT_CODE_OATH)
+	e1:SetDescription(aux.Stringid(id,0))
+	e1:SetCategory(CATEGORY_DISABLE)
+	e1:SetType(EFFECT_TYPE_IGNITION)
+	e1:SetRange(LOCATION_SZONE)
+	e1:SetCountLimit(1,id)
 	e1:SetTarget(s.target)
-	e1:SetOperation(s.activate)
+	e1:SetOperation(s.activate_effect)
 	c:RegisterEffect(e1)
 end
 
------------------------------------------------------------
--- Wicked monster list
------------------------------------------------------------
-s.wicked_list={
-	21208154, -- The Wicked Avatar
-	62180201, -- The Wicked Dreadroot
-	57793869  -- The Wicked Eraser
-}
-
------------------------------------------------------------
--- Filter
------------------------------------------------------------
+--------------------------------
+-- Filter: Wicked monsters no afectados
+--------------------------------
 function s.filter(c)
-	return c:IsFaceup()
-		and aux.IsCode(c,table.unpack(s.wicked_list))
-		and not c:IsHasEffect(id)
+	return c:IsFaceup() and c:IsCode(21208154,62180201,57793869)
+		and c:GetFlagEffect(id)==0
 end
 
------------------------------------------------------------
+--------------------------------
 -- Target
------------------------------------------------------------
+--------------------------------
 function s.target(e,tp,eg,ep,ev,re,r,rp,chk)
 	if chk==0 then
 		return Duel.IsExistingMatchingCard(s.filter,tp,LOCATION_MZONE,0,1,nil)
 	end
-	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_APPLYTO)
-	local g=Duel.SelectMatchingCard(tp,s.filter,tp,LOCATION_MZONE,0,1,1,nil)
-	Duel.SetTargetCard(g)
 end
 
------------------------------------------------------------
+--------------------------------
 -- Activate
------------------------------------------------------------
-function s.activate(e,tp,eg,ep,ev,re,r,rp)
-	local tc=Duel.GetFirstTarget()
-	if not tc or not tc:IsRelateToEffect(e) then return end
+--------------------------------
+function s.activate_effect(e,tp,eg,ep,ev,re,r,rp)
+	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_FACEUP)
+	local tc=Duel.SelectMatchingCard(tp,s.filter,tp,LOCATION_MZONE,0,1,1,nil):GetFirst()
+	if not tc then return end
 	local c=e:GetHandler()
 
-	-- Mark as affected (replaces flag system)
-	local eflag=Effect.CreateEffect(c)
-	eflag:SetType(EFFECT_TYPE_SINGLE)
-	eflag:SetCode(id)
-	eflag:SetProperty(EFFECT_FLAG_SINGLE_RANGE)
-	eflag:SetRange(LOCATION_MZONE)
-	eflag:SetReset(RESET_EVENT|RESETS_STANDARD)
-	tc:RegisterEffect(eflag)
+	-- Marcar como afectado
+	tc:RegisterFlagEffect(id,RESET_EVENT+RESETS_STANDARD+RESET_PHASE+PHASE_END,0,1)
+	tc:RegisterFlagEffect(id,RESET_EVENT+RESETS_STANDARD+RESET_PHASE+PHASE_END,EFFECT_FLAG_CLIENT_HINT,1,0,aux.Stringid(id,1))
 
-	-------------------------------------------------------
-	-- Effects cannot be negated
-	-------------------------------------------------------
+	-- No puede ser negado
 	local e0=Effect.CreateEffect(c)
 	e0:SetType(EFFECT_TYPE_SINGLE)
-	e0:SetCode(EFFECT_CANNOT_DISABLE)
 	e0:SetProperty(EFFECT_FLAG_SINGLE_RANGE)
 	e0:SetRange(LOCATION_MZONE)
-	e0:SetReset(RESET_EVENT|RESETS_STANDARD)
+	e0:SetCode(EFFECT_CANNOT_DISABLE)
+	e0:SetReset(RESET_EVENT+RESETS_STANDARD)
 	tc:RegisterEffect(e0)
 
-	-------------------------------------------------------
-	-- Attribute also treated as DIVINE
-	-------------------------------------------------------
+	--------------------------------
+	-- Aplicar efectos comunes
+	--------------------------------
+	s.apply_common(tc,c)
+end
+
+--------------------------------
+-- Efectos comunes a todos los Wicked
+--------------------------------
+function s.apply_common(tc,c)
+	-- Atributo DIVINE adicional
 	local e1=Effect.CreateEffect(c)
 	e1:SetType(EFFECT_TYPE_SINGLE)
 	e1:SetCode(EFFECT_ADD_ATTRIBUTE)
 	e1:SetValue(ATTRIBUTE_DIVINE)
-	e1:SetReset(RESET_EVENT|RESETS_STANDARD)
+	e1:SetReset(RESET_EVENT+RESETS_STANDARD)
 	tc:RegisterEffect(e1)
 
-	-------------------------------------------------------
-	-- Cannot be used as material for a Special Summon
-	-------------------------------------------------------
+	-- No puede ser material de Special Summon
 	local e2=Effect.CreateEffect(c)
 	e2:SetType(EFFECT_TYPE_SINGLE)
 	e2:SetCode(EFFECT_CANNOT_BE_MATERIAL)
 	e2:SetValue(1)
-	e2:SetReset(RESET_EVENT|RESETS_STANDARD)
+	e2:SetReset(RESET_EVENT+RESETS_STANDARD)
 	tc:RegisterEffect(e2)
 
-	-------------------------------------------------------
-	-- Immune to other monsters' effects except DIVINE
-	-------------------------------------------------------
+	-- Inmune a efectos de monstruos no DIVINE
 	local e3=Effect.CreateEffect(c)
 	e3:SetType(EFFECT_TYPE_SINGLE)
 	e3:SetCode(EFFECT_IMMUNE_EFFECT)
-	e3:SetProperty(EFFECT_FLAG_SINGLE_RANGE)
-	e3:SetRange(LOCATION_MZONE)
-	e3:SetValue(s.immfilter)
-	e3:SetReset(RESET_EVENT|RESETS_STANDARD)
+	e3:SetValue(s.immval)
+	e3:SetReset(RESET_EVENT+RESETS_STANDARD)
 	tc:RegisterEffect(e3)
 
-	-------------------------------------------------------
-	-- Cannot be destroyed by Spell/Trap effects
-	-------------------------------------------------------
+	-- No puede ser destruido por Spell/Trap
 	local e4=Effect.CreateEffect(c)
 	e4:SetType(EFFECT_TYPE_SINGLE)
 	e4:SetCode(EFFECT_INDESTRUCTABLE_EFFECT)
-	e4:SetValue(s.indesfilter)
-	e4:SetReset(RESET_EVENT|RESETS_STANDARD)
+	e4:SetValue(function(e,re,tp)
+		return re:IsActiveType(TYPE_SPELL+TYPE_TRAP)
+	end)
+	e4:SetReset(RESET_EVENT+RESETS_STANDARD)
 	tc:RegisterEffect(e4)
 end
 
------------------------------------------------------------
--- Immunity filters
------------------------------------------------------------
-function s.immfilter(e,re)
-	return re:IsActiveType(TYPE_MONSTER)
-		and not re:GetHandler():IsAttribute(ATTRIBUTE_DIVINE)
-end
-
-function s.indesfilter(e,re,tp)
-	return re:IsActiveType(TYPE_SPELL+TYPE_TRAP)
+--------------------------------
+-- Valor de inmunidad (no DIVINE)
+--------------------------------
+function s.immval(e,re)
+	local c=e:GetHandler()
+	local rc=re:GetHandler()
+	return re:IsActiveType(TYPE_MONSTER) and not rc:IsAttribute(ATTRIBUTE_DIVINE) and rc~=c
 end

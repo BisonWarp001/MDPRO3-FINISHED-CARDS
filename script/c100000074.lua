@@ -12,7 +12,7 @@ function s.initial_effect(c)
 	e1:SetCategory(CATEGORY_DESTROY)
 	e1:SetType(EFFECT_TYPE_ACTIVATE)
 	e1:SetCode(EVENT_FREE_CHAIN)
-	e1:SetCountLimit(1,id) -- Hard OPT
+	e1:SetCountLimit(1,id)
 	e1:SetTarget(s.destg)
 	e1:SetOperation(s.desop)
 	c:RegisterEffect(e1)
@@ -24,7 +24,8 @@ function s.initial_effect(c)
 	e2:SetType(EFFECT_TYPE_QUICK_O)
 	e2:SetCode(EVENT_FREE_CHAIN)
 	e2:SetRange(LOCATION_GRAVE)
-	e2:SetCountLimit(1,id+1) -- Separate Hard OPT
+	e2:SetHintTiming(0,TIMINGS_CHECK_MONSTER+TIMING_MAIN_END)
+	e2:SetCountLimit(1,id+1)
 	e2:SetCost(aux.bfgcost)
 	e2:SetOperation(s.gyop)
 	c:RegisterEffect(e2)
@@ -48,7 +49,7 @@ function s.destg(e,tp,eg,ep,ev,re,r,rp,chk,chkc)
 		return Duel.IsExistingTarget(s.filter,tp,LOCATION_MZONE,0,1,nil)
 	end
 	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_TARGET)
-	local g=Duel.SelectTarget(tp,s.filter,tp,LOCATION_MZONE,0,1,1,nil)
+	Duel.SelectTarget(tp,s.filter,tp,LOCATION_MZONE,0,1,1,nil)
 	Duel.SetOperationInfo(0,CATEGORY_DESTROY,nil,0,PLAYER_ALL,LOCATION_MZONE)
 end
 
@@ -76,12 +77,11 @@ function s.desop(e,tp,eg,ep,ev,re,r,rp)
 	tc:RegisterEffect(e2)
 
 	-- Destroy monsters with less ATK
-	local atk=tc:GetAttack()
-	if atk<0 then atk=0 end
+	local atk=math.max(tc:GetAttack(),0)
 
 	local g=Duel.GetMatchingGroup(function(c)
-		return c:IsFaceup()
-			and c:IsMonster()
+		return c:IsMonster()
+			and c:IsFaceup()
 			and c:GetAttack()<atk
 	end,tp,LOCATION_MZONE,LOCATION_MZONE,tc)
 
@@ -108,6 +108,6 @@ function s.gyop(e,tp,eg,ep,ev,re,r,rp)
 end
 
 function s.aclimit(e,re,tp)
-	return re:GetHandler():IsLocation(LOCATION_GRAVE)
-		and re:IsActivated()
+	return re:IsActivated()
+		and re:GetActivateLocation()==LOCATION_GRAVE
 end
