@@ -46,17 +46,31 @@ end
 -- Costo: remover 1 Slime o Guardian Slime en GY
 -------------------------------------------------
 function s.slimefilter(c)
-	return c:IsCode(0x54b,15771991) and c:IsAbleToRemoveAsCost()
+	return c:IsAbleToRemoveAsCost() and 
+		(c:IsSetCard(0x54b) or c:IsCode(15771991))
 end
 
 function s.negcost(e,tp,eg,ep,ev,re,r,rp,chk)
-	if chk==0 then return Duel.IsExistingMatchingCard(s.slimefilter,tp,LOCATION_GRAVE,0,1,nil) end
+	if chk==0 then 
+		return Duel.IsExistingMatchingCard(s.slimefilter,tp,LOCATION_GRAVE,0,1,nil)
+	end
+
 	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_REMOVE)
 	local g=Duel.SelectMatchingCard(tp,s.slimefilter,tp,LOCATION_GRAVE,0,1,1,nil)
-	if #g>0 then
-		Duel.Remove(g,POS_FACEUP,REASON_COST)
-		e:SetLabelObject(g:GetFirst()) -- guardar para End Phase
-	end
+	local tc=g:GetFirst()
+	if not tc then return end
+
+	Duel.Remove(tc,POS_FACEUP,REASON_COST)
+
+	-- Registrar End Phase AQUÍ
+	local e1=Effect.CreateEffect(e:GetHandler())
+	e1:SetType(EFFECT_TYPE_FIELD+EFFECT_TYPE_CONTINUOUS)
+	e1:SetCode(EVENT_PHASE+PHASE_END)
+	e1:SetCountLimit(1)
+	e1:SetReset(RESET_PHASE+PHASE_END)
+	e1:SetLabelObject(tc)
+	e1:SetOperation(s.retop)
+	Duel.RegisterEffect(e1,tp)
 end
 
 -------------------------------------------------
@@ -75,19 +89,6 @@ function s.negop(e,tp,eg,ep,ev,re,r,rp)
 	if Duel.NegateActivation(ev) then
 		Duel.Destroy(re:GetHandler(),REASON_EFFECT)
 	end
-
-	local c=e:GetHandler()
-	local rc=e:GetLabelObject()
-	if rc then
-		local e1=Effect.CreateEffect(c)
-		e1:SetType(EFFECT_TYPE_FIELD+EFFECT_TYPE_CONTINUOUS)
-		e1:SetCode(EVENT_PHASE+PHASE_END)
-		e1:SetCountLimit(1)
-		e1:SetReset(RESET_PHASE+PHASE_END)
-		e1:SetLabelObject(rc)
-		e1:SetOperation(s.retop)
-		Duel.RegisterEffect(e1,tp)
-	end
 end
 
 -------------------------------------------------
@@ -98,4 +99,5 @@ function s.retop(e,tp,eg,ep,ev,re,r,rp)
 	if rc and rc:IsLocation(LOCATION_REMOVED) then
 		Duel.SendtoHand(rc,nil,REASON_EFFECT)
 	end
+	if rc then rc:DeleteGroup() end
 end

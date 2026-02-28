@@ -5,7 +5,7 @@ function s.initial_effect(c)
 	-- Mention The Wicked Avatar
 	aux.AddCodeList(c,21208154)
 
-	-- Activate (Quick-Play)
+	-- Activate
 	local e1=Effect.CreateEffect(c)
 	e1:SetCategory(CATEGORY_DISABLE+CATEGORY_DESTROY)
 	e1:SetType(EFFECT_TYPE_ACTIVATE)
@@ -37,7 +37,6 @@ function s.activate(e,tp,eg,ep,ev,re,r,rp)
 
 	local atk=avatar:GetAttack()
 
-	-- Group of affected monsters
 	local g=Duel.GetMatchingGroup(function(tc)
 		return tc:IsFaceup()
 			and tc:IsControler(1-tp)
@@ -46,7 +45,7 @@ function s.activate(e,tp,eg,ep,ev,re,r,rp)
 
 	if #g==0 then return end
 
-	-- Negate + cannot be material
+	-- Apply negation + material lock
 	for tc in aux.Next(g) do
 		tc:RegisterFlagEffect(id,RESET_PHASE+PHASE_END,0,1)
 
@@ -78,15 +77,21 @@ function s.activate(e,tp,eg,ep,ev,re,r,rp)
 		tc:RegisterEffect(e6)
 	end
 
+	-------------------------------------------------
 	-- End Phase destruction
+	-------------------------------------------------
 	local e7=Effect.CreateEffect(c)
 	e7:SetType(EFFECT_TYPE_FIELD+EFFECT_TYPE_CONTINUOUS)
 	e7:SetCode(EVENT_PHASE+PHASE_END)
 	e7:SetCountLimit(1)
-	e7:SetCondition(function(_,tp) return Duel.GetTurnPlayer()==tp end)
-	e7:SetOperation(function(_,tp)
+	e7:SetCondition(function(e,tp)
+		return Duel.GetTurnPlayer()==tp
+	end)
+	e7:SetOperation(function(e,tp)
 		local dg=Duel.GetMatchingGroup(function(tc)
-			return tc:GetFlagEffect(id)>0
+			return tc:IsFaceup()
+				and tc:IsControler(1-tp)
+				and tc:GetFlagEffect(id)>0
 		end,tp,0,LOCATION_MZONE,nil)
 
 		if #dg==0 then return end
@@ -99,7 +104,7 @@ function s.activate(e,tp,eg,ep,ev,re,r,rp)
 				if c2 then codes[c2]=true end
 			end
 
-			local e8=Effect.CreateEffect(c)
+			local e8=Effect.CreateEffect(e:GetHandler())
 			e8:SetType(EFFECT_TYPE_FIELD+EFFECT_TYPE_CONTINUOUS)
 			e8:SetCode(EVENT_CHAIN_SOLVING)
 			e8:SetCondition(function(_,tp,_,_,ev,re)

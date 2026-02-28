@@ -1,7 +1,7 @@
 --Pegasus Slime
 local s,id=GetID()
 function s.initial_effect(c)
-	aux.AddCodeList(c,57793869)
+	aux.AddCodeList(c,10000020)
 	-- Special Summon from hand or GY
 	local e1=Effect.CreateEffect(c)
 	e1:SetCategory(CATEGORY_SPECIAL_SUMMON)
@@ -18,7 +18,7 @@ function s.initial_effect(c)
 	e2:SetCategory(CATEGORY_DESTROY+CATEGORY_DAMAGE)
 	e2:SetType(EFFECT_TYPE_IGNITION)
 	e2:SetRange(LOCATION_MZONE)
-	e2:SetCountLimit(1,{id,1})
+	e2:SetCountLimit(1,id+10)
 	e2:SetTarget(s.destg)
 	e2:SetOperation(s.desop)
 	c:RegisterEffect(e2)
@@ -30,7 +30,7 @@ function s.initial_effect(c)
 	e3:SetType(EFFECT_TYPE_SINGLE+EFFECT_TYPE_TRIGGER_O)
 	e3:SetCode(EVENT_TO_GRAVE)
 	e3:SetProperty(EFFECT_FLAG_DELAY)
-	e3:SetCountLimit(1,id+10) -- HOPT automático
+	e3:SetCountLimit(1,id+20) -- HOPT automático
 	e3:SetCondition(s.thcon)
 	e3:SetTarget(s.thtg)
 	e3:SetOperation(s.thop)
@@ -86,7 +86,7 @@ end
 function s.thfilter(c)
 	return c:IsType(TYPE_SPELL+TYPE_TRAP)
 		and c:IsAbleToHand()
-		and aux.IsCodeListed(c,57793869)
+		and aux.IsCodeListed(c,10000020)
 end
 
 function s.thtg(e,tp,eg,ep,ev,re,r,rp,chk)

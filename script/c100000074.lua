@@ -6,25 +6,26 @@ function s.initial_effect(c)
 	aux.AddCodeList(c,62180201)
 
 	-------------------------------------------------
-	-- Effect 1: Protect + Destroy
+	-- ① Protect + Destroy
 	-------------------------------------------------
 	local e1=Effect.CreateEffect(c)
 	e1:SetCategory(CATEGORY_DESTROY)
 	e1:SetType(EFFECT_TYPE_ACTIVATE)
 	e1:SetCode(EVENT_FREE_CHAIN)
+	e1:SetProperty(EFFECT_FLAG_CARD_TARGET)
 	e1:SetCountLimit(1,id)
 	e1:SetTarget(s.destg)
 	e1:SetOperation(s.desop)
 	c:RegisterEffect(e1)
 
 	-------------------------------------------------
-	-- Effect 2: GY Lock
+	-- ② GY Lock
 	-------------------------------------------------
 	local e2=Effect.CreateEffect(c)
+	e2:SetCategory(CATEGORY_REMOVE)
 	e2:SetType(EFFECT_TYPE_QUICK_O)
 	e2:SetCode(EVENT_FREE_CHAIN)
 	e2:SetRange(LOCATION_GRAVE)
-	e2:SetHintTiming(0,TIMINGS_CHECK_MONSTER+TIMING_MAIN_END)
 	e2:SetCountLimit(1,id+1)
 	e2:SetCost(aux.bfgcost)
 	e2:SetOperation(s.gyop)
@@ -50,7 +51,6 @@ function s.destg(e,tp,eg,ep,ev,re,r,rp,chk,chkc)
 	end
 	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_TARGET)
 	Duel.SelectTarget(tp,s.filter,tp,LOCATION_MZONE,0,1,1,nil)
-	Duel.SetOperationInfo(0,CATEGORY_DESTROY,nil,0,PLAYER_ALL,LOCATION_MZONE)
 end
 
 -------------------------------------------------
@@ -68,7 +68,7 @@ function s.desop(e,tp,eg,ep,ev,re,r,rp)
 	e1:SetType(EFFECT_TYPE_SINGLE)
 	e1:SetCode(EFFECT_INDESTRUCTABLE_BATTLE)
 	e1:SetValue(1)
-	e1:SetReset(RESET_PHASE+PHASE_END)
+	e1:SetReset(RESET_EVENT+RESETS_STANDARD+RESET_PHASE+PHASE_END)
 	tc:RegisterEffect(e1)
 
 	-- Cannot be destroyed by effects
@@ -109,5 +109,6 @@ end
 
 function s.aclimit(e,re,tp)
 	return re:IsActivated()
+		and re:IsActiveType(TYPE_MONSTER+TYPE_SPELL+TYPE_TRAP)
 		and re:GetActivateLocation()==LOCATION_GRAVE
 end

@@ -6,7 +6,7 @@ function s.initial_effect(c)
 	aux.AddCodeList(c,62180201)
 
 	-------------------------------------------------
-	-- ① Activate: Add + Extra Tribute
+	-- ① Activate: Add + Extra Tribute Summon
 	-------------------------------------------------
 	local e1=Effect.CreateEffect(c)
 	e1:SetCategory(CATEGORY_TOHAND+CATEGORY_SEARCH)
@@ -18,7 +18,7 @@ function s.initial_effect(c)
 	c:RegisterEffect(e1)
 
 	-------------------------------------------------
-	-- ② GY: Attack all
+	-- ② GY: Attack all monsters
 	-------------------------------------------------
 	local e2=Effect.CreateEffect(c)
 	e2:SetType(EFFECT_TYPE_IGNITION)
@@ -31,7 +31,7 @@ function s.initial_effect(c)
 end
 
 -------------------------------------------------
--- Search
+-- Search "The Wicked Dreadroot"
 -------------------------------------------------
 function s.thfilter(c)
 	return c:IsCode(62180201) and c:IsAbleToHand()
@@ -51,16 +51,13 @@ function s.thop(e,tp,eg,ep,ev,re,r,rp)
 		tp,aux.NecroValleyFilter(s.thfilter),
 		tp,LOCATION_DECK+LOCATION_GRAVE,0,1,1,nil)
 	if #g==0 then return end
-
 	if Duel.SendtoHand(g,nil,REASON_EFFECT)==0 then return end
 	Duel.ConfirmCards(1-tp,g)
 
 	-------------------------------------------------
-	-- Extra Tribute Summon
+	-- Extra Tribute Summon (once this turn)
 	-------------------------------------------------
-	local c=e:GetHandler()
-
-	local e1=Effect.CreateEffect(c)
+	local e1=Effect.CreateEffect(e:GetHandler())
 	e1:SetType(EFFECT_TYPE_FIELD)
 	e1:SetCode(EFFECT_EXTRA_SUMMON_COUNT)
 	e1:SetTargetRange(LOCATION_HAND,0)
@@ -68,11 +65,12 @@ function s.thop(e,tp,eg,ep,ev,re,r,rp)
 		return c:IsTributeSummonable()
 	end)
 	e1:SetReset(RESET_PHASE+PHASE_END)
+	e1:SetCountLimit(1)
 	Duel.RegisterEffect(e1,tp)
 end
 
 -------------------------------------------------
--- GY Effect
+-- GY Effect: Can attack all monsters
 -------------------------------------------------
 function s.dreadfilter(c)
 	return c:IsFaceup() and c:IsCode(62180201)

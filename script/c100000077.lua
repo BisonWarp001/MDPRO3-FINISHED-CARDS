@@ -1,7 +1,7 @@
 --Behemoth Slime
 local s,id=GetID()
 function s.initial_effect(c)
-	aux.AddCodeList(c,21208154)
+	aux.AddCodeList(c,10000010)
 	-- Special Summon by shuffling 2 cards into Deck
 	local e1=Effect.CreateEffect(c)
 	e1:SetCategory(CATEGORY_SPECIAL_SUMMON)
@@ -39,7 +39,7 @@ end
 
 -- Cost: shuffle 2 cards from hand/field/GY into Deck
 function s.costfilter(c)
-	return c:IsAbleToDeckAsCost()
+	return c:IsAbleToDeckOrExtraAsCost()
 end
 
 function s.spcost(e,tp,eg,ep,ev,re,r,rp,chk)
@@ -94,7 +94,7 @@ end
 function s.thfilter(c)
 	return c:IsType(TYPE_SPELL+TYPE_TRAP)
 		and c:IsAbleToHand()
-		and aux.IsCodeListed(c,21208154)
+		and aux.IsCodeListed(c,10000010)
 end
 
 function s.thtg(e,tp,eg,ep,ev,re,r,rp,chk)
