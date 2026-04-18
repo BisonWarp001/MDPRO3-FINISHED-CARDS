@@ -1,120 +1,88 @@
---Profane Altar
+-- Aura of Despair
 local s,id=GetID()
-
 function s.initial_effect(c)
-	aux.AddCodeList(c,21208154,62180201,57793869)
-
-	-- Activate
-	local e0=Effect.CreateEffect(c)
-	e0:SetType(EFFECT_TYPE_ACTIVATE)
-	e0:SetCode(EVENT_FREE_CHAIN)
-	c:RegisterEffect(e0)
-
-	-------------------------------------------------
-	-- Single Effect (Choose 1)
-	-------------------------------------------------
+	-- Mencionar a Dreadroot
+	aux.AddCodeList(c,62180201)
+	
+	-- (1) Activar: Negar efectos de los más débiles (Quick-Play)
 	local e1=Effect.CreateEffect(c)
 	e1:SetDescription(aux.Stringid(id,0))
-	e1:SetType(EFFECT_TYPE_IGNITION)
-	e1:SetRange(LOCATION_SZONE)
-	e1:SetCost(s.cost)
-	e1:SetTarget(s.target)
-	e1:SetOperation(s.operation)
+	e1:SetCategory(CATEGORY_DISABLE)
+	e1:SetType(EFFECT_TYPE_ACTIVATE)
+	e1:SetCode(EVENT_FREE_CHAIN)
+	-- Protección Thunderforce: El oponente no puede responder a esta carta
+	e1:SetProperty(EFFECT_FLAG_CANNOT_INACTIVATE+EFFECT_FLAG_CANNOT_DISABLE+EFFECT_FLAG_CAN_FORBIDDEN)
+	e1:SetHintTiming(TIMINGS_CHECK_MONSTER,TIMINGS_CHECK_MONSTER+TIMING_END_PHASE)
 	e1:SetCountLimit(1,id)
+	e1:SetCondition(s.condition)
+	e1:SetTarget(s.negtg)
+	e1:SetOperation(s.negop)
 	c:RegisterEffect(e1)
+
+	-- (2) GY Effect: Borrado total y Curación
+	local e2=Effect.CreateEffect(c)
+	e2:SetDescription(aux.Stringid(id,1))
+	e2:SetCategory(CATEGORY_DESTROY+CATEGORY_RECOVER)
+	e2:SetType(EFFECT_TYPE_QUICK_O)
+	e2:SetCode(EVENT_FREE_CHAIN)
+	e2:SetRange(LOCATION_GRAVE)
+	e2:SetCountLimit(1,id+100)
+	e2:SetCondition(s.condition)
+	e2:SetCost(aux.bfgcost)
+	e2:SetTarget(s.destg)
+	e2:SetOperation(s.desop)
+	c:RegisterEffect(e2)
 end
 
--------------------------------------------------
--- COST
--------------------------------------------------
-function s.cost(e,tp,eg,ep,ev,re,r,rp,chk)
-	if chk==0 then
-		return Duel.IsExistingMatchingCard(Card.IsDiscardable,tp,LOCATION_HAND,0,1,nil)
-	end
-	Duel.DiscardHand(tp,Card.IsDiscardable,1,1,REASON_COST+REASON_DISCARD)
+-- Condición: Dreadroot debe estar boca arriba en tu campo
+function s.condition(e,tp,eg,ep,ev,re,r,rp)
+	return Duel.IsExistingMatchingCard(aux.FaceupFilter(Card.IsCode,62180201),tp,LOCATION_MZONE,0,1,nil)
 end
 
--------------------------------------------------
--- BASE FILTER
--------------------------------------------------
-function s.godfilter(c)
-	return c:IsType(TYPE_SPELL+TYPE_TRAP)
-		and not c:IsCode(id)
-		and (
-			aux.IsCodeListed(c,21208154)
-			or aux.IsCodeListed(c,62180201)
-			or aux.IsCodeListed(c,57793869)
-		)
+-- Lógica de Negación: Apaga a todos los que ya fueron debilitados por Dreadroot
+function s.negtg(e,tp,eg,ep,ev,re,r,rp,chk)
+	if chk==0 then return Duel.IsExistingMatchingCard(Card.IsFaceup,tp,0,LOCATION_MZONE,1,nil) end
 end
 
-function s.setfilter(c)
-	return s.godfilter(c) and c:IsSSetable()
-end
-
-function s.shufflefilter(c)
-	return s.godfilter(c) and c:IsAbleToDeck()
-end
-
--------------------------------------------------
--- TARGET (FIXED)
--------------------------------------------------
-function s.target(e,tp,eg,ep,ev,re,r,rp,chk)
-	local b1=Duel.IsExistingMatchingCard(s.setfilter,tp,LOCATION_DECK,0,1,nil)
-	local b2=Duel.IsExistingMatchingCard(s.shufflefilter,tp,LOCATION_GRAVE,0,1,nil)
-
-	if chk==0 then return b1 or b2 end
-
-	local op
-	if b1 and b2 then
-		op=Duel.SelectOption(tp,aux.Stringid(id,1),aux.Stringid(id,2))
-	elseif b1 then
-		op=0
-	else
-		op=1
-	end
-	e:SetLabel(op)
-
-	-- Declarar categoría según elección
-	if op==0 then
-		e:SetCategory(CATEGORY_SET)
-		Duel.SetOperationInfo(0,CATEGORY_SET,nil,1,tp,LOCATION_DECK)
-	else
-		e:SetCategory(CATEGORY_TODECK)
-		Duel.SetOperationInfo(0,CATEGORY_TODECK,nil,1,tp,LOCATION_GRAVE)
+function s.negop(e,tp,eg,ep,ev,re,r,rp)
+	local g_dread=Duel.GetMatchingGroup(aux.FaceupFilter(Card.IsCode,62180201),tp,LOCATION_MZONE,0,nil)
+	if #g_dread==0 then return end
+	local max_atk=g_dread:GetMax(Card.GetAttack)
+	
+	-- Captura a todos los monstruos con menos ATK (gracias al /2 de Dreadroot, serán casi todos)
+	local g=Duel.GetMatchingGroup(Card.IsFaceup,tp,0,LOCATION_MZONE,nil):Filter(function(c) return c:GetAttack()<max_atk end,nil)
+	
+	for tc in aux.Next(g) do
+		local e1=Effect.CreateEffect(e:GetHandler())
+		e1:SetType(EFFECT_TYPE_SINGLE)
+		e1:SetCode(EFFECT_DISABLE)
+		e1:SetReset(RESET_EVENT+RESETS_STANDARD+RESET_PHASE+PHASE_END)
+		tc:RegisterEffect(e1)
+		local e2=e1:Clone()
+		e2:SetCode(EFFECT_DISABLE_EFFECT)
+		tc:RegisterEffect(e2)
 	end
 end
 
--------------------------------------------------
--- OPERATION
--------------------------------------------------
-function s.operation(e,tp,eg,ep,ev,re,r,rp)
-	local op=e:GetLabel()
+-- Lógica de GY: Destruye y recupera LP basado en el ATK actual (el ATK ya dividido)
+function s.destg(e,tp,eg,ep,ev,re,r,rp,chk)
+	if chk==0 then return Duel.IsExistingMatchingCard(Card.IsFaceup,tp,0,LOCATION_MZONE,1,nil) end
+	Duel.SetOperationInfo(0,CATEGORY_DESTROY,nil,1,1-tp,LOCATION_MZONE)
+end
 
-	-- Set from Deck
-	if op==0 then
-		Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_SET)
-		local g=Duel.SelectMatchingCard(tp,s.setfilter,tp,LOCATION_DECK,0,1,1,nil)
-		if #g>0 then
-			local tc=g:GetFirst()
-			if Duel.SSet(tp,tc)>0 then
-				local e1=Effect.CreateEffect(e:GetHandler())
-				e1:SetType(EFFECT_TYPE_SINGLE)
-				e1:SetCode(EFFECT_TRAP_ACT_IN_SET_TURN)
-				e1:SetProperty(EFFECT_FLAG_SET_AVAILABLE)
-				e1:SetReset(RESET_EVENT+RESETS_STANDARD)
-				tc:RegisterEffect(e1)
-				local e2=e1:Clone()
-				e2:SetCode(EFFECT_QP_ACT_IN_SET_TURN)
-				tc:RegisterEffect(e2)
-			end
+function s.desop(e,tp,eg,ep,ev,re,r,rp)
+	local g_dread=Duel.GetMatchingGroup(aux.FaceupFilter(Card.IsCode,62180201),tp,LOCATION_MZONE,0,nil)
+	if #g_dread==0 then return end
+	local max_atk=g_dread:GetMax(Card.GetAttack)
+	local g=Duel.GetMatchingGroup(Card.IsFaceup,tp,0,LOCATION_MZONE,nil):Filter(function(c) return c:GetAttack()<max_atk end,nil)
+	
+	if #g>0 then
+		local rec=0
+		for tc in aux.Next(g) do
+			rec=rec+math.max(0,tc:GetAttack())
 		end
-
-	-- Shuffle from GY
-	else
-		Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_TODECK)
-		local g=Duel.SelectMatchingCard(tp,s.shufflefilter,tp,LOCATION_GRAVE,0,1,1,nil)
-		if #g>0 then
-			Duel.SendtoDeck(g,nil,SEQ_DECKSHUFFLE,REASON_EFFECT)
+		if Duel.Destroy(g,REASON_EFFECT)>0 then
+			Duel.Recover(tp,rec,REASON_EFFECT)
 		end
 	end
 end

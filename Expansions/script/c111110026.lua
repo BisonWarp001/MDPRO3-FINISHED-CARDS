@@ -2,11 +2,12 @@
 local s,id=GetID()
 
 function s.initial_effect(c)
-	-- Code list (Slifer)
-	aux.AddCodeList(c,10000020)
+	-- MDPro3 style Code List
+	aux.AddCodeList(c,10000020) -- Slifer
+	
 
 	-------------------------------------------------
-	-- ① Activate: Add Slifer + Extra Tribute Summon (OATH)
+	-- ① Activate: Add Slifer + Extra Tribute Summon
 	-------------------------------------------------
 	local e1=Effect.CreateEffect(c)
 	e1:SetDescription(aux.Stringid(id,0))
@@ -19,13 +20,14 @@ function s.initial_effect(c)
 	c:RegisterEffect(e1)
 
 	-------------------------------------------------
-	-- ② GY: Banish; draw until you have 6 cards (HOPT)
+	-- ② GY: Banish; draw until you have 6 cards
 	-------------------------------------------------
 	local e2=Effect.CreateEffect(c)
 	e2:SetDescription(aux.Stringid(id,1))
 	e2:SetCategory(CATEGORY_DRAW)
 	e2:SetType(EFFECT_TYPE_IGNITION)
 	e2:SetRange(LOCATION_GRAVE)
+	-- HOPT para efecto de cementerio
 	e2:SetCountLimit(1,id)
 	e2:SetCondition(s.gycon)
 	e2:SetCost(aux.bfgcost)
@@ -35,7 +37,7 @@ function s.initial_effect(c)
 end
 
 -------------------------------------------------
--- Search Slifer the Sky Dragon
+-- Search Slifer logic
 -------------------------------------------------
 function s.thfilter(c)
 	return c:IsCode(10000020) and c:IsAbleToHand()
@@ -43,57 +45,51 @@ end
 
 function s.thtg(e,tp,eg,ep,ev,re,r,rp,chk)
 	if chk==0 then
-		return Duel.IsExistingMatchingCard(
-			s.thfilter,tp,LOCATION_DECK+LOCATION_GRAVE,0,1,nil)
+		return Duel.IsExistingMatchingCard(s.thfilter,tp,LOCATION_DECK+LOCATION_GRAVE,0,1,nil)
 	end
 	Duel.SetOperationInfo(0,CATEGORY_TOHAND,nil,1,tp,LOCATION_DECK+LOCATION_GRAVE)
 end
 
 function s.thop(e,tp,eg,ep,ev,re,r,rp)
-	-- Add Slifer
+	-- Búsqueda (Corregido: Sin duplicados)
 	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_ATOHAND)
-	local g=Duel.SelectMatchingCard(
-		tp,aux.NecroValleyFilter(s.thfilter),
-		tp,LOCATION_DECK+LOCATION_GRAVE,0,1,1,nil)
-	if #g==0 then return end
+	local g=Duel.SelectMatchingCard(tp,aux.NecroValleyFilter(s.thfilter),tp,LOCATION_DECK+LOCATION_GRAVE,0,1,1,nil)
+	if #g>0 and Duel.SendtoHand(g,nil,REASON_EFFECT)>0 then
+		Duel.ConfirmCards(1-tp,g)
 
-	Duel.SendtoHand(g,nil,REASON_EFFECT)
-	Duel.ConfirmCards(1-tp,g)
+		-------------------------------------------------
+		-- Extra Tribute Summon (Bloqueo compartido con Ancient Chant)
+		-------------------------------------------------
+		if Duel.GetFlagEffect(tp,78665705)==0 then
+			local e1=Effect.CreateEffect(e:GetHandler())
+			e1:SetDescription(aux.Stringid(id,2))
+			e1:SetType(EFFECT_TYPE_FIELD)
+			e1:SetCode(EFFECT_EXTRA_SUMMON_COUNT)
+			e1:SetTargetRange(LOCATION_HAND,0)
+			e1:SetTarget(aux.TargetBoolFunction(Card.IsLevelAbove,5))
+			e1:SetValue(0x1)
+			e1:SetReset(RESET_PHASE+PHASE_END)
+			Duel.RegisterEffect(e1,tp)
 
-	-------------------------------------------------
-	-- Extra Tribute Summon (shared with Ancient Chant)
-	-------------------------------------------------
-	if Duel.GetFlagEffect(tp,78665705)~=0 then return end
-	if not (Duel.IsPlayerCanSummon(tp) and Duel.IsPlayerCanAdditionalSummon(tp)) then return end
+			local e2=e1:Clone()
+			e2:SetCode(EFFECT_EXTRA_SET_COUNT)
+			Duel.RegisterEffect(e2,tp)
 
-	local e1=Effect.CreateEffect(e:GetHandler())
-	e1:SetDescription(aux.Stringid(id,2))
-	e1:SetType(EFFECT_TYPE_FIELD)
-	e1:SetCode(EFFECT_EXTRA_SUMMON_COUNT)
-	e1:SetTargetRange(LOCATION_HAND,0)
-	e1:SetTarget(aux.TargetBoolFunction(Card.IsLevelAbove,5))
-	e1:SetValue(0x1)
-	e1:SetReset(RESET_PHASE+PHASE_END)
-	Duel.RegisterEffect(e1,tp)
-
-	local e2=e1:Clone()
-	e2:SetCode(EFFECT_EXTRA_SET_COUNT)
-	Duel.RegisterEffect(e2,tp)
-
-	-- Flag global (Ancient Chant compatible)
-	Duel.RegisterFlagEffect(tp,78665705,RESET_PHASE+PHASE_END,0,1)
+			-- Registra el flag de Ancient Chant para que no se puedan usar ambas
+			Duel.RegisterFlagEffect(tp,78665705,RESET_PHASE+PHASE_END,0,1)
+		end
+	end
 end
 
 -------------------------------------------------
--- Draw until you have 6 cards
+-- Draw logic
 -------------------------------------------------
 function s.sliferfilter(c)
 	return c:IsFaceup() and c:IsCode(10000020)
 end
 
 function s.gycon(e,tp,eg,ep,ev,re,r,rp)
-	return Duel.IsExistingMatchingCard(
-		s.sliferfilter,tp,LOCATION_MZONE,0,1,nil)
+	return Duel.IsExistingMatchingCard(s.sliferfilter,tp,LOCATION_MZONE,0,1,nil)
 end
 
 function s.drtg(e,tp,eg,ep,ev,re,r,rp,chk)
@@ -106,6 +102,7 @@ end
 
 function s.drop(e,tp,eg,ep,ev,re,r,rp)
 	local ct=6-Duel.GetFieldGroupCount(tp,LOCATION_HAND,0)
-	if ct<=0 then return end
-	Duel.Draw(tp,ct,REASON_EFFECT)
+	if ct>0 then
+		Duel.Draw(tp,ct,REASON_EFFECT)
+	end
 end

@@ -123,6 +123,19 @@ function s.tkop(e,tp,eg,ep,ev,re,r,rp)
     e2:SetReset(RESET_PHASE+PHASE_END)
     Duel.RegisterEffect(e2,tp)
 end
+-------------------------------------------------
+-- Restricción del Extra Deck
+-------------------------------------------------
+function s.exlimit(e,c)
+    -- Si el monstruo que intentas invocar está en el Extra Deck...
+    if c:GetLocation()==LOCATION_EXTRA then
+        -- ...se PROHÍBE la invocación (return true) a menos que sea uno de estos IDs:
+        return not (c:IsCode(111110017) or c:IsCode(111110019) or c:IsCode(42166000))
+    end
+    -- Si no es del Extra Deck, no hay restricción
+    return false
+end
+
 
 -------------------------------------------------
 -- ③ GY Search
@@ -148,3 +161,4 @@ function s.thop(e,tp,eg,ep,ev,re,r,rp)
         Duel.ConfirmCards(1-tp,g)
     end
 end
+
