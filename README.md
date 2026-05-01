@@ -6,6 +6,8 @@ Se han tomado cartas de este foro https://www.reddit.com/r/customyugioh/comments
 
 Todos los derechos reservados para BatMed. Ví un video en youtube https://www.youtube.com/watch?v=kpUpH0AWsgE&t=1167s que creó BatMed. Recreé las cartas para jugar en MDPRO3, Todo está basado en sus cartas.
 
+De aquí tomé ideas para dichas cartas https://www.youtube.com/watch?v=t45khDWMS4k&t=1s
+
 Algunos cambios se encontrarán debido a problemas de programación pero la mayoria son los mismos. Sin fines de lucro.
 
 Dentro de MDPRO3. 
