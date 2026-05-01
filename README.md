@@ -8,7 +8,7 @@ Todos los derechos reservados para BatMed. Ví un video en youtube https://www.y
 
 De aquí tomé ideas para dichas cartas https://www.youtube.com/watch?v=t45khDWMS4k&t=1s
 
-Algunos cambios se encontrarán debido a problemas de programación pero la mayoria son los mismos. Sin fines de lucro.
+Posiblemente algunas cartas fueron modificadas respecto con las originales. Sin fines de lucro.
 
 Dentro de MDPRO3. 
   1 Copiar y pegar la carpeta Expansions, de ser necesario solo reemplacen, o copien y peguen las carpetas dentro de esta.
