@@ -1,8 +1,9 @@
--- Wicked Gods' Cultist
+-- Cultist of the Wicked Divinities
 local s,id=GetID()
+s.listed_series={0x3f2}
 function s.initial_effect(c)
-    -- Mencionar a los 3 Dioses Oscuros
-    aux.AddCodeList(c,21208154,62180201,57793869)
+    -- Mencionar a los Dioses (Originales y Custom Avatar/Dreadroot)
+    aux.AddCodeList(c,21208154,62180201,57793869,111110200,111110201)
     
     -- (1) Invocación especial revelando Nivel 10 Fiend
     local e1=Effect.CreateEffect(c)
@@ -16,7 +17,7 @@ function s.initial_effect(c)
     e1:SetOperation(s.spop)
     c:RegisterEffect(e1)
     
-    -- (2) Efecto si hay Nivel 10 Fiend en Campo o GY
+    -- (2) Si hay Nivel 10 Fiend: Invocar esta carta o buscar Magia/Trampa
     local e2=Effect.CreateEffect(c)
     e2:SetDescription(aux.Stringid(id,1))
     e2:SetCategory(CATEGORY_SPECIAL_SUMMON+CATEGORY_TOHAND+CATEGORY_SEARCH)
@@ -32,7 +33,7 @@ function s.initial_effect(c)
     local e3=Effect.CreateEffect(c)
     e3:SetDescription(aux.Stringid(id,2))
     e3:SetCategory(CATEGORY_DRAW)
-    e3:SetType(EFFECT_TYPE_SINGLE+EFFECT_TYPE_TRIGGER_F) -- Trigger obligatorio según tu texto
+    e3:SetType(EFFECT_TYPE_SINGLE+EFFECT_TYPE_TRIGGER_F)
     e3:SetProperty(EFFECT_FLAG_PLAYER_TARGET+EFFECT_FLAG_DELAY)
     e3:SetCode(EVENT_RELEASE)
     e3:SetCountLimit(1,id+200)
@@ -42,7 +43,7 @@ function s.initial_effect(c)
     c:RegisterEffect(e3)
 end
 
--- (1) Reveal logic
+-- (1) Revelar Nivel 10 Demonio
 function s.revfilter(c)
     return c:IsRace(RACE_FIEND) and c:IsLevel(10) and not c:IsPublic()
 end
@@ -65,16 +66,19 @@ function s.spop(e,tp,eg,ep,ev,re,r,rp)
     end
 end
 
--- (2) Level 10 Fiend in Field/GY logic
+-- (2) Búsqueda / Invocación
 function s.cfilter(c)
     return c:IsFaceup() and c:IsRace(RACE_FIEND) and c:IsLevel(10)
 end
 function s.wickedcon(e,tp,eg,ep,ev,re,r,rp)
     return Duel.IsExistingMatchingCard(s.cfilter,tp,LOCATION_MZONE,0,1,nil)
-        or Duel.IsExistingMatchingCard(Card.IsRace,tp,LOCATION_GRAVE,0,1,nil,RACE_FIEND,10) -- Level 10 Fiend en GY
+        or Duel.IsExistingMatchingCard(Card.IsRace,tp,LOCATION_GRAVE,0,1,nil,RACE_FIEND) 
+        and Duel.IsExistingMatchingCard(Card.IsLevel,tp,LOCATION_GRAVE,0,1,nil,10)
 end
 function s.thfilter(c)
-    return (aux.IsCodeListed(c,21208154) or aux.IsCodeListed(c,62180201) or aux.IsCodeListed(c,57793869))
+    return (aux.IsCodeListed(c,21208154) or aux.IsCodeListed(c,111110201) 
+        or aux.IsCodeListed(c,62180201) or aux.IsCodeListed(c,111110200) 
+        or aux.IsCodeListed(c,57793869))
         and c:IsType(TYPE_SPELL+TYPE_TRAP) and c:IsAbleToHand()
 end
 function s.wickedtg(e,tp,eg,ep,ev,re,r,rp,chk)
@@ -82,16 +86,11 @@ function s.wickedtg(e,tp,eg,ep,ev,re,r,rp,chk)
         and e:GetHandler():IsCanBeSpecialSummoned(e,0,tp,false,false)
     local b2=Duel.IsExistingMatchingCard(s.thfilter,tp,LOCATION_DECK+LOCATION_GRAVE,0,1,nil)
     if chk==0 then return b1 or b2 end
-    local op=0
-    if b1 and b2 then
-        op=Duel.SelectOption(tp,aux.Stringid(id,3),aux.Stringid(id,4))
-    elseif b1 then
-        op=Duel.SelectOption(tp,aux.Stringid(id,3))
-    else
-        op=Duel.SelectOption(tp,aux.Stringid(id,4))+1
-    end
+    local op=Duel.SelectEffect(tp,
+        {b1, aux.Stringid(id,3)},
+        {b2, aux.Stringid(id,4)})
     e:SetLabel(op)
-    if op==0 then
+    if op==1 then
         e:SetCategory(CATEGORY_SPECIAL_SUMMON)
         Duel.SetOperationInfo(0,CATEGORY_SPECIAL_SUMMON,e:GetHandler(),1,0,0)
     else
@@ -101,14 +100,14 @@ function s.wickedtg(e,tp,eg,ep,ev,re,r,rp,chk)
 end
 function s.wickedop(e,tp,eg,ep,ev,re,r,rp)
     local op=e:GetLabel()
-    if op==0 then
+    if op==1 then
         local c=e:GetHandler()
         if c:IsRelateToEffect(e) and c:IsLocation(LOCATION_HAND) then
             Duel.SpecialSummon(c,0,tp,tp,false,false,POS_FACEUP)
         end
     else
         Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_ATOHAND)
-        local g=Duel.SelectMatchingCard(tp,s.thfilter,tp,LOCATION_DECK+LOCATION_GRAVE,0,1,1,nil)
+        local g=Duel.SelectMatchingCard(tp,aux.NecroValleyFilter(s.thfilter),tp,LOCATION_DECK+LOCATION_GRAVE,0,1,1,nil)
         if #g>0 then
             Duel.SendtoHand(g,nil,REASON_EFFECT)
             Duel.ConfirmCards(1-tp,g)
@@ -116,11 +115,11 @@ function s.wickedop(e,tp,eg,ep,ev,re,r,rp)
     end
 end
 
--- (3) Draw logic
+-- (3) Robo al ser tributado
 function s.drcon(e,tp,eg,ep,ev,re,r,rp)
     local rc=e:GetHandler():GetReasonCard()
-    -- Tributado para invocación por sacrificio de Avatar, Dreadroot o Eraser
-    return rc and (rc:IsCode(21208154) or rc:IsCode(62180201) or rc:IsCode(57793869)) 
+    -- Solo Avatar y Dreadroot (Originales y Custom) + Eraser Original
+    return rc and (rc:IsCode(21208154,111110201) or rc:IsCode(62180201,111110200) or rc:IsCode(57793869)) 
         and e:GetHandler():IsReason(REASON_SUMMON)
 end
 function s.drtg(e,tp,eg,ep,ev,re,r,rp,chk)

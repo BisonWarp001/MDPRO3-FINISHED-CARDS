@@ -5,7 +5,7 @@ function s.initial_effect(c)
 	-- Mencionar tokens
 	aux.AddCodeList(c,111110060)
 	
-	-- (1) Al ser invocado: Buscar 1 carta "Cult" (excepto sí mismo)
+	-- (1)
 	local e1=Effect.CreateEffect(c)
 	e1:SetDescription(aux.Stringid(id,0))
 	e1:SetCategory(CATEGORY_TOHAND+CATEGORY_SEARCH)
@@ -85,28 +85,14 @@ function s.tktg(e,tp,eg,ep,ev,re,r,rp,chk)
 end
 
 function s.tkop(e,tp,eg,ep,ev,re,r,rp)
-	-- Chequeo final de espacio y restricciones
-	if Duel.IsPlayerAffectedByEffect(tp,CARD_BLUEEYES_SPIRIT) or Duel.GetLocationCount(tp,LOCATION_MZONE) < 2 then return end
-	if not Duel.IsPlayerCanSpecialSummonMonster(tp,111110060,0,TYPES_TOKEN,0,0,1,RACE_SPELLCASTER,ATTRIBUTE_LIGHT) then return end
-	
-	for i=1,2 do
-		local token=Duel.CreateToken(tp,111110060)
-		if Duel.SpecialSummonStep(token,0,tp,tp,false,false,POS_FACEUP) then
-			-- Opcional: Si quieres que los tokens no puedan ser tributados para nada excepto Dioses
-			local e1=Effect.CreateEffect(e:GetHandler())
-			e1:SetType(EFFECT_TYPE_SINGLE)
-			e1:SetCode(EFFECT_UNRELEASABLE_ANY)
-			e1:SetValue(s.tribute_limit)
-			e1:SetReset(RESET_EVENT+RESETS_STANDARD)
-			token:RegisterEffect(e1)
-		end
-	end
-	Duel.SpecialSummonComplete()
-end
+    if Duel.IsPlayerAffectedByEffect(tp,CARD_BLUEEYES_SPIRIT) or Duel.GetLocationCount(tp,LOCATION_MZONE) < 2 then return end
+    if not Duel.IsPlayerCanSpecialSummonMonster(tp,111110060,0,TYPES_TOKEN,0,0,1,RACE_SPELLCASTER,ATTRIBUTE_LIGHT) then return end
 
--- Filtro opcional: Solo permite tributarlos para Divine-Beast
-function s.tribute_limit(e,c)
-	return not c:IsRace(RACE_DIVINE)
+    for i=1,2 do
+        local token=Duel.CreateToken(tp,111110060)
+        Duel.SpecialSummonStep(token,0,tp,tp,false,false,POS_FACEUP)
+    end
+    Duel.SpecialSummonComplete()
 end
 
 

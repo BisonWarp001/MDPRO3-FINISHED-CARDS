@@ -1,10 +1,11 @@
--- Priest of the Tyrant Deities
+-- Priest of the Wicked Divinities
 local s,id=GetID()
+s.listed_series={0x3f2}
 function s.initial_effect(c)
-	-- Mencionar a los 3 Dioses Oscuros
-	aux.AddCodeList(c,21208154,62180201,57793869)
+	-- Mencionar a los 3 Dioses Oscuros (Originales y Custom)
+	aux.AddCodeList(c,21208154,62180201,57793869,111110200,111110201)
 	
-	-- (1) Reveal Level 10 Fiend to Special Summon
+	-- (1) Revelar Nivel 10 Fiend para Invocación Especial
 	local e1=Effect.CreateEffect(c)
 	e1:SetDescription(aux.Stringid(id,0))
 	e1:SetCategory(CATEGORY_SPECIAL_SUMMON)
@@ -16,7 +17,7 @@ function s.initial_effect(c)
 	e1:SetOperation(s.spop)
 	c:RegisterEffect(e1)
 	
-	-- (2) Pay 800 to search S/T support from Deck or Banishment
+	-- (2) Pagar 800 para buscar Magia/Trampa (Deck o Desterrado)
 	local e2=Effect.CreateEffect(c)
 	e2:SetDescription(aux.Stringid(id,1))
 	e2:SetCategory(CATEGORY_TOHAND+CATEGORY_SEARCH)
@@ -28,7 +29,7 @@ function s.initial_effect(c)
 	e2:SetOperation(s.thop)
 	c:RegisterEffect(e2)
 	
-	-- (3) Quick Effect: Reveal S/T in hand to negate
+	-- (3) Quick Effect: Revelar Magia/Trampa en mano para negar efecto de monstruo
 	local e3=Effect.CreateEffect(c)
 	e3:SetDescription(aux.Stringid(id,2))
 	e3:SetCategory(CATEGORY_DISABLE)
@@ -43,7 +44,7 @@ function s.initial_effect(c)
 	c:RegisterEffect(e3)
 end
 
--- (1) Reveal Level 10 Fiend
+-- (1) Reveal logic
 function s.revfilter(c)
 	return c:IsRace(RACE_FIEND) and c:IsLevel(10) and not c:IsPublic()
 end
@@ -66,9 +67,11 @@ function s.spop(e,tp,eg,ep,ev,re,r,rp)
 	end
 end
 
--- (2) Search S/T support from Deck or Banishment
+-- (2) Search filter (Ajustado IDs y sintaxis)
 function s.thfilter(c)
-	return (aux.IsCodeListed(c,21208154) or aux.IsCodeListed(c,62180201) or aux.IsCodeListed(c,57793869)) 
+	return (aux.IsCodeListed(c,21208154) or aux.IsCodeListed(c,111110201) 
+		or aux.IsCodeListed(c,62180201) or aux.IsCodeListed(c,111110200) 
+		or aux.IsCodeListed(c,57793869)) 
 		and c:IsType(TYPE_SPELL+TYPE_TRAP) and c:IsAbleToHand()
 end
 function s.thcost(e,tp,eg,ep,ev,re,r,rp,chk)
@@ -81,20 +84,22 @@ function s.thtg(e,tp,eg,ep,ev,re,r,rp,chk)
 end
 function s.thop(e,tp,eg,ep,ev,re,r,rp)
 	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_ATOHAND)
-	local g=Duel.SelectMatchingCard(tp,aux.NecroValleyFilter(s.thfilter),tp,LOCATION_DECK+LOCATION_REMOVED,0,1,1,nil)
+	local g=Duel.SelectMatchingCard(tp,s.thfilter,tp,LOCATION_DECK+LOCATION_REMOVED,0,1,1,nil)
 	if #g>0 then
 		Duel.SendtoHand(g,nil,REASON_EFFECT)
 		Duel.ConfirmCards(1-tp,g)
 	end
 end
 
--- (3) Negate monster effect by revealing S/T in hand
+-- (3) Negate logic
 function s.discon(e,tp,eg,ep,ev,re,r,rp)
 	return rp==1-tp and re:IsActiveType(TYPE_MONSTER) and Duel.IsChainDisablable(ev)
 		and (Duel.GetCurrentPhase()==PHASE_MAIN1 or Duel.GetCurrentPhase()==PHASE_MAIN2)
 end
 function s.negrevfilter(c)
-	return (aux.IsCodeListed(c,21208154) or aux.IsCodeListed(c,62180201) or aux.IsCodeListed(c,57793869)) 
+	return (aux.IsCodeListed(c,21208154) or aux.IsCodeListed(c,111110201) 
+		or aux.IsCodeListed(c,62180201) or aux.IsCodeListed(c,111110200) 
+		or aux.IsCodeListed(c,57793869)) 
 		and c:IsType(TYPE_SPELL+TYPE_TRAP) and not c:IsPublic()
 end
 function s.discost(e,tp,eg,ep,ev,re,r,rp,chk)

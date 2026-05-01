@@ -1,4 +1,4 @@
--- Awakening of the Unleashed Divinity
+--Unleashed Divinity
 local s,id=GetID()
 
 function s.initial_effect(c)
@@ -181,7 +181,7 @@ function s.apply_slifer(tc,c)
 	e1:SetCode(EVENT_FREE_CHAIN)
 	e1:SetRange(LOCATION_MZONE)
 	e1:SetCountLimit(1)
-	e1:SetHintTiming(0,TIMINGS_CHECK_MONSTER)
+	e1:SetHintTiming(0,TIMINGS_CHECK_MONSTER+TIMING_MAIN_END+TIMING_BATTLE_START+TIMING_BATTLE_END)
 	e1:SetCost(s.slifercost)
 	e1:SetTarget(s.slifertg)
 	e1:SetOperation(s.sliferop)
@@ -226,6 +226,7 @@ function s.apply_obelisk(tc,c)
 	e1:SetType(EFFECT_TYPE_QUICK_O)
 	e1:SetCode(EVENT_FREE_CHAIN)
 	e1:SetRange(LOCATION_MZONE)
+	e1:SetCountLimit(1)
 	e1:SetHintTiming(0,TIMINGS_CHECK_MONSTER+TIMING_MAIN_END+TIMING_BATTLE_START+TIMING_BATTLE_END)
 	e1:SetCondition(s.obcon)
 	e1:SetCost(s.obcost)

@@ -1,5 +1,6 @@
--- Soul of The Winged Dragon of Ra terminado
+-- Chosen Pharaoh' Ra terminado
 local s,id=GetID()
+s.listed_series={0x4b0}
 function s.initial_effect(c)
 	-- Mencionar a Ra
 	aux.AddCodeList(c,10000010)

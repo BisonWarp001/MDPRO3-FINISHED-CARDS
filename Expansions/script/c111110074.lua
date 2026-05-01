@@ -1,8 +1,8 @@
 -- Total Submission
 local s,id=GetID()
 function s.initial_effect(c)
-	-- Mencionar a Dreadroot
-	aux.AddCodeList(c,62180201)
+	-- Mencionar a Dreadroot (Original y Custom)
+	aux.AddCodeList(c,62180201,111110200)
 	
 	-------------------------------------------------
 	-- (1) Activar: Quick-Play Shuffle
@@ -20,24 +20,23 @@ function s.initial_effect(c)
 	c:RegisterEffect(e1)
 	
 	-------------------------------------------------
-	-- (2) GY: Banish to double ATK/DEF
+	-- (2) GY: Protección por sustitución (Protege de Eraser y rival)
 	-------------------------------------------------
 	local e2=Effect.CreateEffect(c)
-	e2:SetDescription(aux.Stringid(id,1))
-	e2:SetCategory(CATEGORY_TODECK+CATEGORY_ATKCHANGE+CATEGORY_DEFCHANGE)
-	e2:SetType(EFFECT_TYPE_IGNITION)
+	e2:SetType(EFFECT_TYPE_FIELD+EFFECT_TYPE_CONTINUOUS)
+	e2:SetCode(EFFECT_DESTROY_SUBSTITUTE)
 	e2:SetRange(LOCATION_GRAVE)
-	e2:SetProperty(EFFECT_FLAG_CARD_TARGET)
-	e2:SetCost(aux.bfgcost)
-	e2:SetTarget(s.atktg)
-	e2:SetOperation(s.atkop)
+	e2:SetTarget(s.subtg)
+	e2:SetValue(s.subval)
 	c:RegisterEffect(e2)
 end
 
--- (1) Lógica: Shuffle (Ahora como Quick-Play)
+-- Filtro para Dreadroot (Incluye Custom)
 function s.cfilter(c)
-	return c:IsFaceup() and c:IsCode(62180201)
+	return c:IsFaceup() and (c:IsCode(62180201) or c:IsCode(111110200))
 end
+
+-- (1) Lógica: Shuffle
 function s.condition(e,tp,eg,ep,ev,re,r,rp)
 	return Duel.IsExistingMatchingCard(s.cfilter,tp,LOCATION_MZONE,0,1,nil)
 end
@@ -65,39 +64,28 @@ function s.activate(e,tp,eg,ep,ev,re,r,rp)
 	end
 end
 
--- (2) Lógica: GY Effect (Misma que antes)
-function s.tdfilter(c)
-	return c:IsMonster() and c:IsAbleToDeck()
+-- (2) Lógica: GY Effect
+-- Filtro para Dreadroot (Incluye Custom)
+function s.cfilter(c)
+	return c:IsFaceup() and (c:IsCode(62180201) or c:IsCode(111110200))
 end
-function s.atkfilter(c)
-	return c:IsFaceup() and c:IsCode(62180201)
+
+-- Lógica de Sustitución
+function s.subfilter(c,tp)
+	return c:IsControler(tp) and c:IsLocation(LOCATION_MZONE) 
+		and s.cfilter(c) and c:IsFaceup() and not c:IsReason(REASON_REPLACE)
 end
-function s.atktg(e,tp,eg,ep,ev,re,r,rp,chk,chkc)
-	if chkc then return chkc:IsLocation(LOCATION_MZONE) and chkc:IsControler(tp) and s.atkfilter(chkc) end
-	if chk==0 then return Duel.IsExistingMatchingCard(s.tdfilter,tp,LOCATION_GRAVE,0,2,nil)
-		and Duel.IsExistingTarget(s.atkfilter,tp,LOCATION_MZONE,0,1,nil) end
-	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_TODECK)
-	local g=Duel.SelectMatchingCard(tp,s.tdfilter,tp,LOCATION_GRAVE,0,2,2,nil)
-	Duel.SetOperationInfo(0,CATEGORY_TODECK,g,2,0,0)
-	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_TARGET)
-	Duel.SelectTarget(tp,s.atkfilter,tp,LOCATION_MZONE,0,1,1,nil)
-end
-function s.atkop(e,tp,eg,ep,ev,re,r,rp)
-	local tc=Duel.GetFirstTarget()
-	local g=Duel.GetMatchingGroup(s.tdfilter,tp,LOCATION_GRAVE,0,nil):Select(tp,2,2,nil)
-	if #g==2 and Duel.SendtoDeck(g,nil,SEQ_DECKSHUFFLE,REASON_EFFECT)==2 then
-		if tc:IsRelateToEffect(e) and tc:IsFaceup() then
-			local e1=Effect.CreateEffect(e:GetHandler())
-			e1:SetType(EFFECT_TYPE_SINGLE)
-			e1:SetCode(EFFECT_SET_ATTACK_FINAL)
-			e1:SetRange(LOCATION_MZONE)
-			e1:SetValue(tc:GetBaseAttack()*2)
-			e1:SetReset(RESET_EVENT+RESETS_STANDARD)
-			tc:RegisterEffect(e1)
-			local e2=e1:Clone()
-			e2:SetCode(EFFECT_SET_DEFENSE_FINAL)
-			e2:SetValue(tc:GetBaseDefense()*2)
-			tc:RegisterEffect(e2)
-		end
+
+function s.subtg(e,tp,eg,ep,ev,re,r,rp,chk)
+	if chk==0 then return eg:IsExists(s.subfilter,1,nil,tp) 
+		and e:GetHandler():IsAbleToRemove() end
+	if Duel.SelectEffectYesNo(tp,e:GetHandler(),aux.Stringid(id,1)) then
+		Duel.Remove(e:GetHandler(),POS_FACEUP,REASON_EFFECT)
+		return true
 	end
+	return false
+end
+
+function s.subval(e,c)
+	return s.subfilter(c,e:GetHandlerPlayer())
 end

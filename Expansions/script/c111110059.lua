@@ -44,7 +44,6 @@ function s.initial_effect(c)
 	c:RegisterEffect(e5)
 end
 
--- Filtro para monstruos "Cult" (Por SetCard o por nombre)
 function s.atktg(e,c)
 	return c:IsSetCard(0x4b0) or c:IsType(TYPE_MONSTER) and c:IsCode(id_de_algun_cult) -- Opcional: c:GetText():find("Cult")
 end

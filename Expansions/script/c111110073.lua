@@ -1,88 +1,74 @@
--- Awakening of the Unleashed Malevolence
+-- Awakening of the Wicked Deities
 local s,id=GetID()
 
 function s.initial_effect(c)
-	-- Mención de los Dioses Malvados
-	aux.AddCodeList(c,62180201,57793869,21208154)
+	-- Mención de los Wicked Gods (Originales y Custom)
+	aux.AddCodeList(c,62180201,57793869,21208154,111110200,111110201)
 
-	-- Activación: No puede ser negada
 	local e1=Effect.CreateEffect(c)
 	e1:SetType(EFFECT_TYPE_ACTIVATE)
 	e1:SetCode(EVENT_FREE_CHAIN)
+	-- Inmunidad de la Magia
 	e1:SetProperty(EFFECT_FLAG_CANNOT_INACTIVATE+EFFECT_FLAG_CANNOT_DISABLE+EFFECT_FLAG_CAN_FORBIDDEN)
 	e1:SetTarget(s.target)
 	e1:SetOperation(s.activate)
 	c:RegisterEffect(e1)
 end
 
--------------------------------------------------
--- TARGET: Seleccionar 1 Dios Malvado
--------------------------------------------------
-function s.filter(c)
-	return c:IsFaceup()
-		and (c:IsCode(62180201) or c:IsCode(57793869) or c:IsCode(21208154))
+function s.filter(c,id)
+	return c:IsFaceup() and (c:IsCode(62180201,57793869,21208154,111110200,111110201)) 
 		and c:GetFlagEffect(id)==0
 end
 
 function s.target(e,tp,eg,ep,ev,re,r,rp,chk)
-	if chk==0 then
-		return Duel.IsExistingMatchingCard(s.filter,tp,LOCATION_MZONE,0,1,nil)
-	end
+	if chk==0 then return Duel.IsExistingMatchingCard(s.filter,tp,LOCATION_MZONE,0,1,nil,id) end
 end
 
--------------------------------------------------
--- OPERACIÓN PRINCIPAL
--------------------------------------------------
 function s.activate(e,tp,eg,ep,ev,re,r,rp)
-	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_APPLYTO)
-	local tc=Duel.SelectMatchingCard(tp,s.filter,tp,LOCATION_MZONE,0,1,1,nil):GetFirst()
+	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_FACEUP)
+	local g=Duel.SelectMatchingCard(tp,s.filter,tp,LOCATION_MZONE,0,1,1,nil,id)
+	local tc=g:GetFirst()
 	if not tc then return end
-
 	local c=e:GetHandler()
 
-	-- Registro de efecto aplicado
-	tc:RegisterFlagEffect(id,RESET_EVENT+RESETS_STANDARD,0,1)
+	-- Registro visual y protección de efectos
 	tc:RegisterFlagEffect(id,RESET_EVENT+RESETS_STANDARD,EFFECT_FLAG_CLIENT_HINT,1,0,aux.Stringid(id,0))
-
-	-- Inmunidad a negación de efectos (del monstruo y ganados)
+	
 	local e0=Effect.CreateEffect(c)
 	e0:SetType(EFFECT_TYPE_SINGLE)
 	e0:SetCode(EFFECT_CANNOT_DISABLE)
-	e0:SetProperty(EFFECT_FLAG_SINGLE_RANGE)
-	e0:SetRange(LOCATION_MZONE)
 	e0:SetReset(RESET_EVENT+RESETS_STANDARD)
-	tc:RegisterEffect(e0)
+	tc:RegisterEffect(e0,true)
 
-	-- Aplicar Protecciones Comunes (Material e Inmunidad)
+	-- Protecciones (No material / Inmunidad)
 	s.apply_common(tc,c)
 
-	-- Aplicar Efectos Ganados específicos
-	if tc:IsCode(21208154) then -- The Wicked Avatar
+	-- Efectos Ganados según el nombre
+	if tc:IsCode(21208154,111110201) then -- Avatar (CAMPO + GY)
 		s.apply_avatar(tc,c)
-	elseif tc:IsCode(57793869) then -- The Wicked Eraser
+	elseif tc:IsCode(57793869) then -- Eraser
 		s.apply_eraser(tc,c)
-	elseif tc:IsCode(62180201) then -- The Wicked Dreadroot
+	elseif tc:IsCode(62180201,111110200) then -- Dreadroot
 		s.apply_dreadroot(tc,c)
 	end
 end
 
 function s.apply_common(tc,c)
-	-- ① No puede ser material de Invocación Especial
 	local e1=Effect.CreateEffect(c)
 	e1:SetType(EFFECT_TYPE_SINGLE)
 	e1:SetCode(EFFECT_CANNOT_BE_MATERIAL)
 	e1:SetValue(aux.FilterBoolFunction(Card.IsType,TYPE_SPECIAL))
 	e1:SetReset(RESET_EVENT+RESETS_STANDARD)
-	tc:RegisterEffect(e1)
-
-	-- ② Inmune a efectos activados del oponente
+	tc:RegisterEffect(e1,true)
+	
 	local e2=Effect.CreateEffect(c)
 	e2:SetType(EFFECT_TYPE_SINGLE)
 	e2:SetCode(EFFECT_IMMUNE_EFFECT)
+	e2:SetProperty(EFFECT_FLAG_SINGLE_RANGE+EFFECT_FLAG_CANNOT_DISABLE)
 	e2:SetRange(LOCATION_MZONE)
 	e2:SetValue(s.efilter)
 	e2:SetReset(RESET_EVENT+RESETS_STANDARD)
-	tc:RegisterEffect(e2)
+	tc:RegisterEffect(e2,true)
 end
 
 function s.efilter(e,te)
@@ -90,116 +76,128 @@ function s.efilter(e,te)
 end
 
 -------------------------------------------------
--- AVATAR: Negar Magia/Trampa
+-- AVATAR: Copia desde Campo o Cementerio
 -------------------------------------------------
 function s.apply_avatar(tc,c)
 	local e1=Effect.CreateEffect(c)
 	e1:SetDescription(aux.Stringid(id,1))
-	e1:SetCategory(CATEGORY_NEGATE+CATEGORY_DESTROY)
 	e1:SetType(EFFECT_TYPE_QUICK_O)
-	e1:SetCode(EVENT_CHAINING)
-	e1:SetProperty(EFFECT_FLAG_DAMAGE_STEP+EFFECT_FLAG_DAMAGE_CAL)
+	e1:SetCode(EVENT_FREE_CHAIN)
 	e1:SetRange(LOCATION_MZONE)
+	e1:SetProperty(EFFECT_FLAG_CANNOT_DISABLE)
+	e1:SetHintTiming(0,TIMINGS_CHECK_MONSTER+TIMING_END_PHASE)
 	e1:SetCountLimit(1)
-	e1:SetCondition(s.discon)
-	e1:SetTarget(s.distg)
-	e1:SetOperation(s.disop)
+	e1:SetTarget(s.copy_tg)
+	e1:SetOperation(s.copy_op)
 	e1:SetReset(RESET_EVENT+RESETS_STANDARD)
-	tc:RegisterEffect(e1)
+	tc:RegisterEffect(e1,true)
 end
-function s.discon(e,tp,eg,ep,ev,re,r,rp)
-	return not e:GetHandler():IsStatus(STATUS_BATTLE_DESTROYED) and Duel.IsChainNegatable(ev)
-		and (re:IsActiveType(TYPE_SPELL) or re:IsActiveType(TYPE_TRAP))
+
+function s.copy_tg(e,tp,eg,ep,ev,re,r,rp,chk)
+	-- Filtro: Monstruos de Efecto en MZONE o GRAVE de ambos jugadores
+	if chk==0 then return Duel.IsExistingMatchingCard(Card.IsType,tp,LOCATION_MZONE+LOCATION_GRAVE,LOCATION_MZONE+LOCATION_GRAVE,1,e:GetHandler(),TYPE_EFFECT) end
 end
-function s.distg(e,tp,eg,ep,ev,re,r,rp,chk)
-	if chk==0 then return true end
-	Duel.SetOperationInfo(0,CATEGORY_NEGATE,eg,1,0,0)
-	if re:GetHandler():IsDestructable() and re:GetHandler():IsRelateToEffect(re) then
-		Duel.SetOperationInfo(0,CATEGORY_DESTROY,eg,1,0,0)
-	end
-end
-function s.disop(e,tp,eg,ep,ev,re,r,rp)
-	if Duel.NegateActivation(ev) and re:GetHandler():IsRelateToEffect(re) then
-		Duel.Destroy(eg,REASON_EFFECT)
-	end
+
+function s.copy_op(e,tp,eg,ep,ev,re,r,rp)
+    local c=e:GetHandler()
+    Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_FACEUP)
+    local g=Duel.SelectMatchingCard(tp,Card.IsType,tp,LOCATION_MZONE+LOCATION_GRAVE,LOCATION_MZONE+LOCATION_GRAVE,1,1,c,TYPE_EFFECT)
+    local tc=g:GetFirst()
+    if tc and tc:IsFaceup() then
+        Duel.MajesticCopy(c,tc)
+        c:SetHint(CHINT_CARD,tc:GetCode())
+        
+        -- ESTA LÍNEA ES LA CLAVE:
+        -- Fuerza al juego a re-evaluar todos los efectos continuos en el campo inmediatamente.
+        Duel.Readjust() 
+    end
 end
 
 -------------------------------------------------
--- ERASER: ATK 0 y Negar (Quick Effect)
+-- ERASER: Negación "Choose"
 -------------------------------------------------
 function s.apply_eraser(tc,c)
 	local e1=Effect.CreateEffect(c)
 	e1:SetDescription(aux.Stringid(id,2))
-	e1:SetCategory(CATEGORY_ATKCHANGE+CATEGORY_DISABLE)
+	e1:SetCategory(CATEGORY_DISABLE)
 	e1:SetType(EFFECT_TYPE_QUICK_O)
 	e1:SetCode(EVENT_FREE_CHAIN)
 	e1:SetRange(LOCATION_MZONE)
+	e1:SetProperty(EFFECT_FLAG_CANNOT_DISABLE)
+	e1:SetHintTiming(0,TIMINGS_CHECK_MONSTER+TIMING_END_PHASE)
 	e1:SetCountLimit(1)
-	e1:SetHintTiming(0,TIMINGS_CHECK_MONSTER)
-	e1:SetTarget(s.eratktg)
-	e1:SetOperation(s.eratkop)
+	e1:SetTarget(s.neg_tg)
+	e1:SetOperation(s.neg_op)
 	e1:SetReset(RESET_EVENT+RESETS_STANDARD)
-	tc:RegisterEffect(e1)
+	tc:RegisterEffect(e1,true)
 end
-function s.eratktg(e,tp,eg,ep,ev,re,r,rp,chk)
+
+function s.neg_tg(e,tp,eg,ep,ev,re,r,rp,chk)
 	if chk==0 then return Duel.IsExistingMatchingCard(Card.IsFaceup,tp,0,LOCATION_MZONE,1,nil) end
 end
-function s.eratkop(e,tp,eg,ep,ev,re,r,rp)
-	local c=e:GetHandler()
-	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_TARGET)
-	local tc=Duel.SelectMatchingCard(tp,Card.IsFaceup,tp,0,LOCATION_MZONE,1,1,nil):GetFirst()
+
+function s.neg_op(e,tp,eg,ep,ev,re,r,rp)
+	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_FACEUP)
+	local g=Duel.SelectMatchingCard(tp,Card.IsFaceup,tp,0,LOCATION_MZONE,1,1,nil)
+	local tc=g:GetFirst()
 	if tc then
-		Duel.NegateRelatedChain(tc,RESET_TURN_SET)
-		-- ATK a 0
-		local e1=Effect.CreateEffect(c)
+		local e1=Effect.CreateEffect(e:GetHandler())
 		e1:SetType(EFFECT_TYPE_SINGLE)
-		e1:SetCode(EFFECT_SET_ATTACK_FINAL)
-		e1:SetValue(0)
+		e1:SetCode(EFFECT_DISABLE)
 		e1:SetReset(RESET_EVENT+RESETS_STANDARD+RESET_PHASE+PHASE_END)
 		tc:RegisterEffect(e1)
-		-- Negar efectos
-		local e2=Effect.CreateEffect(c)
-		e2:SetType(EFFECT_TYPE_SINGLE)
-		e2:SetCode(EFFECT_DISABLE)
-		e2:SetReset(RESET_EVENT+RESETS_STANDARD+RESET_PHASE+PHASE_END)
+		local e2=e1:Clone()
+		e2:SetCode(EFFECT_DISABLE_EFFECT)
 		tc:RegisterEffect(e2)
-		local e3=e2:Clone()
-		e3:SetCode(EFFECT_DISABLE_EFFECT)
-		tc:RegisterEffect(e3)
 	end
 end
 
 -------------------------------------------------
--- DREADROOT: Destruir 1 y ganar ATK (Quick Effect)
+-- DREADROOT: Sentencia "Choose"
 -------------------------------------------------
 function s.apply_dreadroot(tc,c)
 	local e1=Effect.CreateEffect(c)
 	e1:SetDescription(aux.Stringid(id,3))
-	e1:SetCategory(CATEGORY_DESTROY+CATEGORY_ATKCHANGE)
+	e1:SetCategory(CATEGORY_DESTROY)
 	e1:SetType(EFFECT_TYPE_QUICK_O)
 	e1:SetCode(EVENT_FREE_CHAIN)
 	e1:SetRange(LOCATION_MZONE)
+	e1:SetProperty(EFFECT_FLAG_CANNOT_DISABLE)
+	e1:SetHintTiming(0,TIMINGS_CHECK_MONSTER+TIMING_END_PHASE)
 	e1:SetCountLimit(1)
-	e1:SetHintTiming(0,TIMINGS_CHECK_MONSTER)
-	e1:SetTarget(s.drdtg)
-	e1:SetOperation(s.drdop)
+	e1:SetTarget(s.des_tg)
+	e1:SetOperation(s.des_op)
 	e1:SetReset(RESET_EVENT+RESETS_STANDARD)
-	tc:RegisterEffect(e1)
+	tc:RegisterEffect(e1,true)
 end
-function s.drdtg(e,tp,eg,ep,ev,re,r,rp,chk)
+
+function s.des_tg(e,tp,eg,ep,ev,re,r,rp,chk)
 	if chk==0 then return Duel.IsExistingMatchingCard(nil,tp,0,LOCATION_MZONE,1,nil) end
-	local g=Duel.GetMatchingGroup(nil,tp,0,LOCATION_MZONE,nil)
-	Duel.SetOperationInfo(0,CATEGORY_DESTROY,g,1,0,0)
 end
-function s.drdop(e,tp,eg,ep,ev,re,r,rp)
-	local c=e:GetHandler()
+
+function s.des_op(e,tp,eg,ep,ev,re,r,rp)
 	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_DESTROY)
 	local g=Duel.SelectMatchingCard(tp,nil,tp,0,LOCATION_MZONE,1,1,nil)
-	if #g>0 then
-		local tc=g:GetFirst()
+	local tc=g:GetFirst()
+	if tc then
+		local e1=Effect.CreateEffect(e:GetHandler())
+		e1:SetType(EFFECT_TYPE_FIELD+EFFECT_TYPE_CONTINUOUS)
+		e1:SetCode(EVENT_PHASE+PHASE_END)
+		e1:SetCountLimit(1)
+		e1:SetLabelObject(tc)
+		e1:SetOperation(s.des_end_op)
+		e1:SetReset(RESET_PHASE+PHASE_END)
+		Duel.RegisterEffect(e1,tp)
+		tc:RegisterFlagEffect(id,RESET_EVENT+RESETS_STANDARD+RESET_PHASE+PHASE_END,EFFECT_FLAG_CLIENT_HINT,1,0,aux.Stringid(id,4))
+	end
+end
+
+function s.des_end_op(e,tp,eg,ep,ev,re,r,rp)
+	local tc=e:GetLabelObject()
+	local c=e:GetOwner() 
+	if tc and tc:IsLocation(LOCATION_MZONE) then
 		local atk=tc:GetAttack()
-		if atk<0 then atk=0 end
-		if Duel.Destroy(tc,REASON_EFFECT)>0 and c:IsRelateToEffect(e) and c:IsFaceup() then
+		if Duel.Destroy(tc,REASON_EFFECT)>0 and c:IsLocation(LOCATION_MZONE) and c:IsFaceup() then
 			local e1=Effect.CreateEffect(c)
 			e1:SetType(EFFECT_TYPE_SINGLE)
 			e1:SetCode(EFFECT_UPDATE_ATTACK)

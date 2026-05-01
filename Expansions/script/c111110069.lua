@@ -1,8 +1,9 @@
--- Disciple of the Dark Gods
+-- Disciple of the Wicked Divinities
 local s,id=GetID()
+s.listed_series={0x3f2}
 function s.initial_effect(c)
-	-- Mencionar a los 3 Dioses Oscuros
-	aux.AddCodeList(c,21208154,62180201,57793869)
+	-- Mencionar a los 3 Dioses Oscuros (Originales y Custom)
+	aux.AddCodeList(c,21208154,62180201,57793869,111110200,111110201)
 	
 	-------------------------------------------------
 	-- (1) Al ser invocado: Invoca hasta 2 copias de sí mismo
@@ -37,7 +38,7 @@ function s.initial_effect(c)
 	c:RegisterEffect(e2b)
 
 	-------------------------------------------------
-	-- (3) End Phase: Barajar Magia/Trampa Wicked de GY/Banish -> Recuperar de GY
+	-- (3) End Phase: Barajar Magia/Trampa Wicked de GY/Banish -> Recuperar esta carta
 	-------------------------------------------------
 	local e3=Effect.CreateEffect(c)
 	e3:SetDescription(aux.Stringid(id,2))
@@ -51,7 +52,7 @@ function s.initial_effect(c)
 	c:RegisterEffect(e3)
 end
 
--- Lógica (1) Especial (Sin cambios)
+-- Lógica (1) Especial
 function s.spfilter(c,e,tp)
 	return c:IsCode(id) and c:IsCanBeSpecialSummoned(e,0,tp,false,false)
 end
@@ -72,13 +73,13 @@ function s.spop(e,tp,eg,ep,ev,re,r,rp)
 	end
 end
 
--- Lógica (2) Invocación Extra (Sin cambios)
+-- Lógica (2) Invocación Extra
 function s.sumop_extra(e,tp,eg,ep,ev,re,r,rp)
 	if Duel.GetFlagEffect(tp,id)==0 then
 		local e1=Effect.CreateEffect(e:GetHandler())
 		e1:SetDescription(aux.Stringid(id,1))
 		e1:SetType(EFFECT_TYPE_FIELD)
-		e1:SetTargetRange(LOCATION_HAND+LOCATION_MZONE,0)
+		e1:SetTargetRange(LOCATION_HAND,0) -- La invocación extra suele ser desde la mano
 		e1:SetCode(EFFECT_EXTRA_SUMMON_COUNT)
 		e1:SetReset(RESET_PHASE+PHASE_END)
 		Duel.RegisterEffect(e1,tp)
@@ -86,11 +87,11 @@ function s.sumop_extra(e,tp,eg,ep,ev,re,r,rp)
 	end
 end
 
--- Lógica (3) MODIFICADA: Solo Cementerio y Destierro
+-- Lógica (3) Filtro actualizado con IDs Custom
 function s.tdfilter(c)
 	return c:IsType(TYPE_SPELL+TYPE_TRAP)
-		and (aux.IsCodeListed(c,21208154) -- Avatar
-		or aux.IsCodeListed(c,62180201) -- Dreadroot
+		and (aux.IsCodeListed(c,21208154) or aux.IsCodeListed(c,111110201) -- Avatar
+		or aux.IsCodeListed(c,62180201) or aux.IsCodeListed(c,111110200) -- Dreadroot
 		or aux.IsCodeListed(c,57793869)) -- Eraser
 		and c:IsAbleToDeck()
 end

@@ -1,5 +1,6 @@
--- Soul of Obelisk the Tormentor terminado
+-- Chosen Pharaoh' Obelisk terminado
 local s,id=GetID()
+s.listed_series={0x4b0}
 function s.initial_effect(c)
 	aux.AddCodeList(c,10000000)
 

@@ -133,7 +133,7 @@ function s.ttop(e,tp,eg,ep,ev,re,r,rp,c)
 	c:SetMaterial(g)
 	Duel.Release(g,REASON_SUMMON+REASON_MATERIAL)
 end
-function s.RequireSummon(e,c) return c:IsCode(10000000,10000010,10000020,10000080,21208154,57793869,62180201,57761191) end
+function s.RequireSummon(e,c) return c:IsCode(10000000,10000010,10000020,10000080,21208154,57793869,62180201,57761191,111110200,111110201) end
 function s.RequireSet(e,c) return c:IsCode(21208154,57793869,62180201) end
 function s.CanSummon(e,c) return c:IsCode(3912064,25524823,36354007,75285069,78651105) end
 

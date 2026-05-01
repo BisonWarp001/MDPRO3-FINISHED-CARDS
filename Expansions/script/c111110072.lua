@@ -1,8 +1,8 @@
 -- Arrival of the Endless Calamity
 local s,id=GetID()
 function s.initial_effect(c)
-	-- Mencionar a los 3 Dioses Oscuros
-	aux.AddCodeList(c,21208154,62180201,57793869)
+	-- Mencionar a los 3 Dioses Oscuros (Originales y Custom)
+	aux.AddCodeList(c,21208154,62180201,57793869,111110200,111110201)
 
 	-------------------------------------------------
 	-- (1) Activar: Añadir Nivel 10 Fiend + Normal Summon (Protegida)
@@ -12,7 +12,6 @@ function s.initial_effect(c)
 	e1:SetCategory(CATEGORY_TOHAND+CATEGORY_SEARCH+CATEGORY_SUMMON)
 	e1:SetType(EFFECT_TYPE_ACTIVATE)
 	e1:SetCode(EVENT_FREE_CHAIN)
-	-- HintTiming para que brille como Quick-Play en momentos clave
 	e1:SetHintTiming(0,TIMINGS_CHECK_MONSTER+TIMING_END_PHASE)
 	e1:SetCountLimit(1,id)
 	e1:SetTarget(s.target)
@@ -34,13 +33,14 @@ function s.initial_effect(c)
 	c:RegisterEffect(e2)
 end
 
--- (1) Lógica: Add + Summon con Protección
+-- (1) Filtros para Add + Summon
 function s.filter(c)
 	return c:IsRace(RACE_FIEND) and c:IsLevel(10) and c:IsAbleToHand()
 end
 function s.sumfilter(c)
 	return c:IsRace(RACE_FIEND) and c:IsLevel(10) and c:IsSummonable(true,nil)
 end
+
 function s.target(e,tp,eg,ep,ev,re,r,rp,chk)
 	if chk==0 then return Duel.IsExistingMatchingCard(s.filter,tp,LOCATION_DECK+LOCATION_GRAVE,0,1,nil) end
 	Duel.SetOperationInfo(0,CATEGORY_TOHAND,nil,1,tp,LOCATION_DECK+LOCATION_GRAVE)
@@ -58,7 +58,7 @@ function s.activate(e,tp,eg,ep,ev,re,r,rp)
 			and Duel.SelectYesNo(tp,aux.Stringid(id,2)) then
 			Duel.BreakEffect()
 			
-			-- PROTECCIÓN: No se puede negar la invocación
+			-- PROTECCIÓN: Innegable
 			local e1=Effect.CreateEffect(e:GetHandler())
 			e1:SetType(EFFECT_TYPE_FIELD)
 			e1:SetCode(EFFECT_CANNOT_DISABLE_SUMMON)
@@ -66,7 +66,7 @@ function s.activate(e,tp,eg,ep,ev,re,r,rp)
 			e1:SetReset(RESET_PHASE+PHASE_END)
 			Duel.RegisterEffect(e1,tp)
 			
-			-- PROTECCIÓN: El oponente no puede activar nada al invocar (Chain Limit)
+			-- PROTECCIÓN: Bloqueo de respuesta
 			local e2=Effect.CreateEffect(e:GetHandler())
 			e2:SetType(EFFECT_TYPE_FIELD+EFFECT_TYPE_CONTINUOUS)
 			e2:SetCode(EVENT_SUMMON_SUCCESS)
@@ -83,27 +83,30 @@ function s.activate(e,tp,eg,ep,ev,re,r,rp)
 	end
 end
 
--- Función auxiliar para bloquear respuesta
 function s.sumsuc(e,tp,eg,ep,ev,re,r,rp)
 	Duel.SetChainLimitTillChainEnd(aux.FALSE)
 end
 
--- (2) Lógica: Special Summon desde Hand/Removed
+-- (2) Lógica: Invocación Especial (Incluye Custom e ignorar condiciones)
 function s.spfilter(c,e,tp)
-	return (c:IsCode(21208154) or c:IsCode(62180201) or c:IsCode(57793869))
+	-- Incluye Avatar (201) y Dreadroot (200) custom
+	return (c:IsCode(21208154) or c:IsCode(62180201) or c:IsCode(57793869) or (c:IsCode(111110200) or (c:IsCode(111110201))
 		and c:IsCanBeSpecialSummoned(e,0,tp,true,false)
 end
+
 function s.sptg(e,tp,eg,ep,ev,re,r,rp,chk)
 	if chk==0 then return Duel.GetLocationCount(tp,LOCATION_MZONE)>0
 		and Duel.IsExistingMatchingCard(s.spfilter,tp,LOCATION_HAND+LOCATION_REMOVED,0,1,nil,e,tp) end
 	Duel.SetOperationInfo(0,CATEGORY_SPECIAL_SUMMON,nil,1,tp,LOCATION_HAND+LOCATION_REMOVED)
 end
+
 function s.spop(e,tp,eg,ep,ev,re,r,rp)
 	if Duel.GetLocationCount(tp,LOCATION_MZONE)<=0 then return end
 	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_SPSUMMON)
 	local g=Duel.SelectMatchingCard(tp,s.spfilter,tp,LOCATION_HAND+LOCATION_REMOVED,0,1,1,nil,e,tp)
 	local tc=g:GetFirst()
 	if tc then
+		-- El 'true' en el 4to parámetro ignora las condiciones de invocación
 		Duel.SpecialSummon(tc,0,tp,tp,true,false,POS_FACEUP)
 	end
 end

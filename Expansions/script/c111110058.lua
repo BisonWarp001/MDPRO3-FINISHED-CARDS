@@ -1,5 +1,6 @@
--- Slifer the Sky Dragon Cult terminado
+-- Chosen Pharaoh's Slifer terminado
 local s,id=GetID()
+s.listed_series={0x4b0}
 function s.initial_effect(c)
 	-- Mencionar a Slifer
 	aux.AddCodeList(c,10000020)
