@@ -139,7 +139,7 @@ function s.RequireSummon(e,c)
 end
 
 function s.RequireSet(e,c)
-	return c:IsCode(21208154,57793869,62180201)
+	return c:IsCode(21208154,57793869,62180201,111110200,111110201)
 end
 
 function s.CanSummon(e,c)
