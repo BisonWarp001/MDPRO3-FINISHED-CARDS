@@ -7,18 +7,20 @@ function s.initial_effect(c)
 
 	-------------------------------------------------
 	-- ① Al activarse: Add 1 Divine-Beast + Normal Summon (Cualquier Divine-Beast)
+	-- MODIFICADO: Se añade TYPE_QUICKPLAY para que actúe como Magia de Juego Rápido
 	-------------------------------------------------
 	local e1=Effect.CreateEffect(c)
 	e1:SetDescription(aux.Stringid(id,0))
 	e1:SetCategory(CATEGORY_TOHAND+CATEGORY_SEARCH+CATEGORY_SUMMON)
 	e1:SetType(EFFECT_TYPE_ACTIVATE)
+	e1:SetProperty(EFFECT_FLAG_DAMAGE_STEP+EFFECT_FLAG_DAMAGE_CAL) -- Permite activarse en Quick-Play estándar
 	e1:SetCode(EVENT_FREE_CHAIN)
 	e1:SetCountLimit(1,id)
 	e1:SetTarget(s.target)
 	e1:SetOperation(s.activate)
 	c:RegisterEffect(e1)
 
-		-------------------------------------------------
+	-------------------------------------------------
 	-- ② En GY: Banish; Special Summon (Efecto Rápido)
 	-------------------------------------------------
 	local e2=Effect.CreateEffect(c)

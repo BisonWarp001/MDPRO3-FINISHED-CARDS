@@ -171,48 +171,48 @@ function s.raop(e,tp,eg,ep,ev,re,r,rp)
 end
 
 -------------------------------------------------
--- SLIFER
+-- SLIFER (MODIFICADO: Escudo de Segunda Boca Nerfeado)
 -------------------------------------------------
 function s.apply_slifer(tc,c)
 	local e1=Effect.CreateEffect(c)
 	e1:SetDescription(aux.Stringid(id,2))
-	e1:SetCategory(CATEGORY_DISABLE)
 	e1:SetType(EFFECT_TYPE_QUICK_O)
 	e1:SetCode(EVENT_FREE_CHAIN)
 	e1:SetRange(LOCATION_MZONE)
 	e1:SetCountLimit(1)
-	e1:SetHintTiming(0,TIMINGS_CHECK_MONSTER+TIMING_MAIN_END+TIMING_BATTLE_START+TIMING_BATTLE_END)
-	e1:SetCost(s.slifercost)
+	e1:SetHintTiming(0,TIMINGS_CHECK_MONSTER+TIMING_BATTLE_START+TIMING_ATTACK)
+	e1:SetCondition(s.slifercon)
 	e1:SetTarget(s.slifertg)
 	e1:SetOperation(s.sliferop)
 	e1:SetReset(RESET_EVENT+RESETS_STANDARD)
 	tc:RegisterEffect(e1,true)
 end
 
-function s.slifercost(e,tp,eg,ep,ev,re,r,rp,chk)
-	if chk==0 then return Duel.IsExistingMatchingCard(Card.IsDiscardable,tp,LOCATION_HAND,0,1,nil) end
-	Duel.DiscardHand(tp,Card.IsDiscardable,1,1,REASON_COST+REASON_DISCARD)
+-- Condición estricta: Solo en el turno del oponente
+function s.slifercon(e,tp,eg,ep,ev,re,r,rp)
+	return Duel.GetTurnPlayer()~=tp
 end
 
+-- Target: Solo permite activarse si Slifer está actualmente en Posición de Defensa
 function s.slifertg(e,tp,eg,ep,ev,re,r,rp,chk)
-	if chk==0 then return Duel.IsExistingMatchingCard(Card.IsFaceup,tp,0,LOCATION_MZONE,1,nil) end
+	if chk==0 then return e:GetHandler():IsDefensePos() end
 end
 
+-- Operación: Aplica la redirección de ataque si Slifer continúa en Defensa al resolver
 function s.sliferop(e,tp,eg,ep,ev,re,r,rp)
 	local c=e:GetHandler()
-	if not c:IsRelateToEffect(e) or c:IsFacedown() then return end
-	local g=Duel.GetMatchingGroup(function(bc) 
-		return bc:IsFaceup() and bc:GetAttack()<=c:GetAttack() 
-	end,tp,0,LOCATION_MZONE,nil)
-	for tc in aux.Next(g) do
+	if c:IsRelateToEffect(e) and c:IsDefensePos() and c:IsFaceup() then
+		-- Crea una restricción global en el campo para bloquear objetivos de ataque
 		local e1=Effect.CreateEffect(c)
-		e1:SetType(EFFECT_TYPE_SINGLE)
-		e1:SetCode(EFFECT_DISABLE)
-		e1:SetReset(RESET_EVENT+RESETS_STANDARD+RESET_PHASE+PHASE_END)
-		tc:RegisterEffect(e1)
-		local e2=e1:Clone()
-		e2:SetCode(EFFECT_DISABLE_EFFECT)
-		tc:RegisterEffect(e2)
+		e1:SetType(EFFECT_TYPE_FIELD)
+		e1:SetCode(EFFECT_CANNOT_SELECT_BATTLE_TARGET)
+		e1:SetTargetRange(0,LOCATION_MZONE)
+		e1:SetValue(function(e,tc) return tc~=c end) -- Prohíbe elegir cualquier carta que no sea este Slifer
+		e1:SetReset(RESET_PHASE+PHASE_END)
+		Duel.RegisterEffect(e1,tp)
+		
+		-- Indicador visual en pantalla para avisar que el Escudo está activo
+		Duel.Hint(HINT_CARD,0,10000020)
 	end
 end
 

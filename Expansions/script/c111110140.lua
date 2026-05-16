@@ -1,93 +1,107 @@
---The Altar of the Ultimate Gods
+-- Nordic Relic Randgrith
 local s,id=GetID()
-s.listed_series={0x3e8}
-
 function s.initial_effect(c)
-
-	-------------------------------------------------
-	-- Activate
-	-------------------------------------------------
-	local e0=Effect.CreateEffect(c)
-	e0:SetType(EFFECT_TYPE_ACTIVATE)
-	e0:SetCode(EVENT_FREE_CHAIN)
-	c:RegisterEffect(e0)
-
-	-------------------------------------------------
-	-- (1) Cannot be destroyed twice per turn
-	-------------------------------------------------
+	-- Activar carta
 	local e1=Effect.CreateEffect(c)
-	e1:SetType(EFFECT_TYPE_SINGLE)
-	e1:SetProperty(EFFECT_FLAG_SINGLE_RANGE)
-	e1:SetRange(LOCATION_FZONE)
-	e1:SetCode(EFFECT_INDESTRUCTABLE_COUNT)
-	e1:SetCountLimit(2)
-	e1:SetValue(s.indct)
+	e1:SetType(EFFECT_TYPE_ACTIVATE)
+	e1:SetCode(EVENT_FREE_CHAIN)
 	c:RegisterEffect(e1)
-
-	-------------------------------------------------
-	-- (2) Search "Ultimate God" card (HOPT)
-	-------------------------------------------------
+	
+	-- Efecto al invocar un Aesir
 	local e2=Effect.CreateEffect(c)
 	e2:SetDescription(aux.Stringid(id,0))
-	e2:SetCategory(CATEGORY_SEARCH+CATEGORY_TOHAND)
-	e2:SetType(EFFECT_TYPE_IGNITION)
-	e2:SetRange(LOCATION_FZONE)
-	e2:SetCountLimit(1,id)
-	e2:SetTarget(s.thtg)
-	e2:SetOperation(s.thop)
+	e2:SetCategory(CATEGORY_SPECIAL_SUMMON+CATEGORY_TOHAND+CATEGORY_SEARCH)
+	e2:SetType(EFFECT_TYPE_FIELD+EFFECT_TYPE_TRIGGER_O)
+	e2:SetProperty(EFFECT_FLAG_DELAY)
+	e2:SetCode(EVENT_SPSUMMON_SUCCESS)
+	e2:SetRange(LOCATION_SZONE)
+	e2:SetCondition(s.condition)
+	e2:SetTarget(s.target)
+	e2:SetOperation(s.operation)
 	c:RegisterEffect(e2)
-
-	-------------------------------------------------
-	-- (3) Tribute → draw (3 times per turn)
-	-------------------------------------------------
-	local e3=Effect.CreateEffect(c)
-	e3:SetType(EFFECT_TYPE_FIELD+EFFECT_TYPE_CONTINUOUS)
-	e3:SetCode(EVENT_RELEASE)
-	e3:SetRange(LOCATION_FZONE)
-	e3:SetCountLimit(3,id+100)
-	e3:SetOperation(s.drawop)
-	c:RegisterEffect(e3)
-
 end
 
--------------------------------------------------
--- (1) destruction protection
--------------------------------------------------
-function s.indct(e,re,r,rp)
-	return (r&REASON_EFFECT)~=0
+function s.condition(e,tp,eg,ep,ev,re,r,rp)
+	local tc=eg:GetFirst()
+	-- Debe ser un Aesir (0x4b) boca arriba
+	if not (tc:IsFaceup() and tc:IsSetCard(0x4b)) then return false end
+	
+	-- Verificamos si es Sincronía O si se invocó por su propio efecto
+	local is_self_revive = (re and re:GetHandler()==tc and tc:GetSummonType()==SUMMON_TYPE_SPECIAL+SUMMON_VALUE_SELF)
+	return tc:GetSummonType()==SUMMON_TYPE_SYNCHRO or is_self_revive
 end
 
--------------------------------------------------
--- (2) Search
--------------------------------------------------
+function s.target(e,tp,eg,ep,ev,re,r,rp,chk)
+	if chk==0 then return true end
+	Duel.SetTargetCard(eg)
+end
+
+function s.operation(e,tp,eg,ep,ev,re,r,rp)
+	local tc=Duel.GetFirstTarget()
+	if not tc or not tc:IsRelateToEffect(e) or tc:IsFacedown() then return end
+	local c=e:GetHandler()
+
+	-- ● LIGHT (Odin / Customs de Luz): Set 1 "Nordic Relic"
+	if tc:IsAttribute(ATTRIBUTE_LIGHT) and Duel.IsExistingMatchingCard(s.setfilter,tp,LOCATION_DECK,0,1,nil)
+		and Duel.SelectYesNo(tp, aux.Stringid(id,1)) then
+		Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_SET)
+		local g=Duel.SelectMatchingCard(tp,s.setfilter,tp,LOCATION_DECK,0,1,1,nil)
+		if #g>0 then
+			local sc=g:GetFirst()
+			if Duel.SSet(tp,sc)>0 then
+				local e1=Effect.CreateEffect(c)
+				e1:SetType(EFFECT_TYPE_SINGLE)
+				e1:SetCode(EFFECT_TRAP_ACT_IN_SET_TURN)
+				e1:SetProperty(EFFECT_FLAG_SET_AVAILABLE)
+				e1:SetReset(RESET_EVENT+RESETS_STANDARD+RESET_PHASE+PHASE_END)
+				sc:RegisterEffect(e1)
+				local e2=e1:Clone()
+				e2:SetCode(EFFECT_QP_ACT_IN_SET_TURN)
+				sc:RegisterEffect(e2)
+			end
+		end
+	end
+
+	-- ● EARTH (Thor / Customs de Tierra): Special Summon 1 "Nordic" + Restricción
+	if tc:IsAttribute(ATTRIBUTE_EARTH) and Duel.GetLocationCount(tp,LOCATION_MZONE)>0
+		and Duel.IsExistingMatchingCard(s.spfilter,tp,LOCATION_GRAVE,0,1,nil,e,tp)
+		and Duel.SelectYesNo(tp, aux.Stringid(id,2)) then
+		Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_SPSUMMON)
+		local g=Duel.SelectMatchingCard(tp,aux.NecroValleyFilter(s.spfilter),tp,LOCATION_GRAVE,0,1,1,nil,e,tp)
+		if #g>0 and Duel.SpecialSummon(g,0,tp,tp,false,false,POS_FACEUP)>0 then
+			local e1=Effect.CreateEffect(c)
+			e1:SetType(EFFECT_TYPE_FIELD)
+			e1:SetProperty(EFFECT_FLAG_PLAYER_TARGET+EFFECT_FLAG_OATH)
+			e1:SetCode(EFFECT_CANNOT_SPECIAL_SUMMON)
+			e1:SetTargetRange(1,0)
+			e1:SetTarget(s.splimit)
+			e1:SetReset(RESET_PHASE+PHASE_END)
+			Duel.RegisterEffect(e1,tp)
+		end
+	end
+
+	-- ● DARK (Loki / Customs de Oscuridad): Añadir de GY/Banish a mano
+	if tc:IsAttribute(ATTRIBUTE_DARK) and Duel.IsExistingMatchingCard(s.thfilter,tp,LOCATION_GRAVE+LOCATION_REMOVED,0,1,nil)
+		and Duel.SelectYesNo(tp, aux.Stringid(id,3)) then
+		Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_ATOHAND)
+		local g=Duel.SelectMatchingCard(tp,aux.NecroValleyFilter(s.thfilter),tp,LOCATION_GRAVE+LOCATION_REMOVED,0,1,1,nil)
+		if #g>0 then
+			Duel.SendtoHand(g,nil,REASON_EFFECT)
+			Duel.ConfirmCards(1-tp,g)
+		end
+	end
+end
+
+-- Filtros
+function s.setfilter(c)
+	return c:IsSetCard(0x5042) and c:IsSSetable()
+end
+function s.spfilter(c,e,tp)
+	return c:IsSetCard(0x42) and c:IsCanBeSpecialSummoned(e,0,tp,false,false)
+end
 function s.thfilter(c)
-	return c:IsSetCard(0x3e8) and c:IsAbleToHand()
+	return c:IsSetCard(0x42) and c:IsAbleToHand()
 end
-
-function s.thtg(e,tp,eg,ep,ev,re,r,rp,chk)
-	if chk==0 then
-		return Duel.IsExistingMatchingCard(s.thfilter,tp,LOCATION_DECK,0,1,nil)
-	end
-	Duel.SetOperationInfo(0,CATEGORY_TOHAND,nil,1,tp,LOCATION_DECK)
-end
-
-function s.thop(e,tp,eg,ep,ev,re,r,rp)
-	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_ATOHAND)
-	local g=Duel.SelectMatchingCard(tp,s.thfilter,tp,LOCATION_DECK,0,1,1,nil)
-	if #g>0 then
-		Duel.SendtoHand(g,nil,REASON_EFFECT)
-		Duel.ConfirmCards(1-tp,g)
-	end
-end
-
--------------------------------------------------
--- (3) Tribute → draw
--------------------------------------------------
-function s.cfilter(c,tp)
-	return c:IsPreviousControler(tp)
-end
-
-function s.drawop(e,tp,eg,ep,ev,re,r,rp)
-	if not eg:IsExists(s.cfilter,1,nil,tp) then return end
-	Duel.Draw(tp,1,REASON_EFFECT)
+function s.splimit(e,c)
+	return not (c:IsSetCard(0x42) or c:IsSetCard(0x4b)) and c:IsLocation(LOCATION_EXTRA)
 end

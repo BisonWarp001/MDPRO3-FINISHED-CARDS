@@ -3,7 +3,7 @@ local s,id=GetID()
 s.listed_series={0x3f2}
 function s.initial_effect(c)
 	-- Mencionar a los 3 Dioses Oscuros (Originales y Custom)
-	aux.AddCodeList(c,62180201,21208154,57793869,111110200,111110201)
+	aux.AddCodeList(c,62180201,21208154,57793869)
 	
 	-- (0) Activación
 	local e0=Effect.CreateEffect(c)
@@ -89,9 +89,11 @@ end
 -- Draw logic (Ajustado con IDs Custom)
 --====================================
 function s.cfilter(c,tp)
-	-- Se activa con Avatar, Dreadroot o Eraser (Originales y tus IDs Custom)
-	return c:IsSummonPlayer(tp) and (c:IsCode(62180201,111110200) or c:IsCode(21208154,111110201) or c:IsCode(57793869))
+    -- Se activa con Avatar, Dreadroot o Eraser (Originales y IDs Custom)
+    return c:IsSummonPlayer(tp) and 
+        (c:IsCode(62180201) or c:IsCode(21208154) or c:IsCode(57793869))
 end
+
 function s.drcon(e,tp,eg,ep,ev,re,r,rp)
 	return eg:IsExists(s.cfilter,1,nil,tp)
 end

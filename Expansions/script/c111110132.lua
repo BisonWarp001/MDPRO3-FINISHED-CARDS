@@ -1,4 +1,4 @@
--- Jack's Poker Knight (ID: 111110132)
+-- Jack's Joker Knight (ID: 111110132)
 local s,id=GetID()
 function s.initial_effect(c)
 	-- Mantenemos los originales solo en la lista de códigos para las Magias oficiales
@@ -12,7 +12,7 @@ function s.initial_effect(c)
 	e1:SetValue(90876561)
 	c:RegisterEffect(e1)
 
-	-- (1) Search Level 10 on Special Summon by King's POKER Knight
+	-- (1) Search Level 10 on Special Summon by King's JOKER Knight
 	local e2=Effect.CreateEffect(c)
 	e2:SetDescription(aux.Stringid(id,0))
 	e2:SetCategory(CATEGORY_TOHAND+CATEGORY_SEARCH+CATEGORY_SUMMON)

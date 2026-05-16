@@ -1,4 +1,4 @@
--- King's Poker Knight (ID: 111110131)
+-- King's Joker Knight (ID: 111110131)
 local s,id=GetID()
 function s.initial_effect(c)
     -- Compatibilidad con soporte oficial

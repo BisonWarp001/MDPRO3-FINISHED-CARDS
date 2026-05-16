@@ -3,7 +3,7 @@ local s,id=GetID()
 
 function s.initial_effect(c)
 	-- Mención de los Wicked Gods (Originales y Custom)
-	aux.AddCodeList(c,62180201,57793869,21208154,111110200,111110201)
+	aux.AddCodeList(c,62180201,57793869,21208154)
 
 	local e1=Effect.CreateEffect(c)
 	e1:SetType(EFFECT_TYPE_ACTIVATE)
@@ -16,7 +16,7 @@ function s.initial_effect(c)
 end
 
 function s.filter(c,id)
-	return c:IsFaceup() and (c:IsCode(62180201,57793869,21208154,111110200,111110201)) 
+	return c:IsFaceup() and (c:IsCode(62180201,57793869,21208154)) 
 		and c:GetFlagEffect(id)==0
 end
 
@@ -44,11 +44,11 @@ function s.activate(e,tp,eg,ep,ev,re,r,rp)
 	s.apply_common(tc,c)
 
 	-- Efectos Ganados según el nombre
-	if tc:IsCode(21208154,111110201) then -- Avatar (CAMPO + GY)
+	if tc:IsCode(21208154) then -- Avatar (CAMPO + GY)
 		s.apply_avatar(tc,c)
 	elseif tc:IsCode(57793869) then -- Eraser
 		s.apply_eraser(tc,c)
-	elseif tc:IsCode(62180201,111110200) then -- Dreadroot
+	elseif tc:IsCode(62180201) then -- Dreadroot
 		s.apply_dreadroot(tc,c)
 	end
 end

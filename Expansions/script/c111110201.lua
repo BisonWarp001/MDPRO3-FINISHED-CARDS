@@ -2,6 +2,13 @@
 local s,id=GetID() --111110201
 
 function s.initial_effect(c)
+	-- (REGLA) Nombre siempre The Wicked Dreadroot
+	local e0=Effect.CreateEffect(c)
+	e0:SetType(EFFECT_TYPE_SINGLE)
+	e0:SetProperty(EFFECT_FLAG_CANNOT_DISABLE+EFFECT_FLAG_UNCOPYABLE)
+	e0:SetCode(EFFECT_ADD_CODE)
+	e0:SetValue(21208154) -- ID original de Avatar
+	c:RegisterEffect(e0)
 	--Summon with 3 Tributes
 	local e1=Effect.CreateEffect(c)
 	e1:SetType(EFFECT_TYPE_SINGLE)

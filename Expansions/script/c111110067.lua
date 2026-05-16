@@ -6,7 +6,7 @@ function s.initial_effect(c)
 	c:SetUniqueOnField(1,0,id)
 
 	-- Mencionar monstruos Wicked (Originales y Custom)
-	aux.AddCodeList(c,21208154,62180201,57793869,111110200,111110201)
+	aux.AddCodeList(c,21208154,62180201,57793869)
 
 	-- Activación
 	local e0=Effect.CreateEffect(c)
@@ -40,7 +40,7 @@ end
 --------------------------------
 -- Lista de códigos Wicked Corregida
 --------------------------------
-s.wicked_list={21208154,62180201,57793869,111110200,111110201}
+s.wicked_list={21208154,62180201,57793869}
 
 function s.wicked(c)
 	return c:IsCode(table.unpack(s.wicked_list))

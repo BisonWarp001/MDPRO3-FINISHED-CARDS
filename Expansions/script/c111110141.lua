@@ -1,244 +1,76 @@
---Wrath of the Ultimate Gods
+-- Script de Bifröst, the Nordic Unity Bridge
 local s,id=GetID()
-s.listed_series={0x3e8}
-
 function s.initial_effect(c)
-	c:EnableReviveLimit()
-
-	-------------------------------------------------
-	-- Fusion materials (exactly 3)
-	-------------------------------------------------
-	aux.AddFusionProcFunRep(c,s.matfilter,3,true)
-
-	-------------------------------------------------
-	-- Contact Fusion
-	-------------------------------------------------
-	aux.AddContactFusionProcedure(c,
-		function(c)
-			-- Solo monstruos "Ultimate God"
-			return c:IsSetCard(0x3e8) and c:IsType(TYPE_MONSTER)
-		end,
-		LOCATION_MZONE,0,
-		function(g)
-			Duel.SendtoGrave(g,REASON_MATERIAL+REASON_COST)
-		end,
-		nil,
-		aux.FCheckAdditional=function(tp,sg,fc)
-			-- Verifica que sean exactamente 3 materiales
-			return #sg==3
-		end
-	)
-	
-	-------------------------------------------------
-	-- Cannot negate Special Summon
-	-------------------------------------------------
-	local e0=Effect.CreateEffect(c)
-	e0:SetType(EFFECT_TYPE_SINGLE)
-	e0:SetCode(EFFECT_CANNOT_DISABLE_SPSUMMON)
-	e0:SetProperty(EFFECT_FLAG_CANNOT_DISABLE+EFFECT_FLAG_UNCOPYABLE)
-	c:RegisterEffect(e0)
-
-	-------------------------------------------------
-	-- Chain lock
-	-------------------------------------------------
-	local e0b=Effect.CreateEffect(c)
-	e0b:SetType(EFFECT_TYPE_SINGLE+EFFECT_TYPE_CONTINUOUS)
-	e0b:SetCode(EVENT_SPSUMMON_SUCCESS)
-	e0b:SetOperation(s.sumsuc)
-	c:RegisterEffect(e0b)
-
-	-------------------------------------------------
-	-- (1) Banish field + GY + burn
-	-------------------------------------------------
+	-- Activar: Special Summon 1 "Aesir" desterrado
 	local e1=Effect.CreateEffect(c)
 	e1:SetDescription(aux.Stringid(id,0))
-	e1:SetCategory(CATEGORY_REMOVE+CATEGORY_DAMAGE)
-	e1:SetType(EFFECT_TYPE_SINGLE+EFFECT_TYPE_TRIGGER_O)
-	e1:SetCode(EVENT_SPSUMMON_SUCCESS)
-	e1:SetProperty(EFFECT_FLAG_DELAY)
-	e1:SetCountLimit(1)
-	e1:SetCondition(s.burncon)
-	e1:SetTarget(s.burntg)
-	e1:SetOperation(s.burnop)
+	e1:SetCategory(CATEGORY_SPECIAL_SUMMON)
+	e1:SetType(EFFECT_TYPE_ACTIVATE)
+	e1:SetCode(EVENT_FREE_CHAIN)
+	e1:SetProperty(EFFECT_FLAG_CARD_TARGET)
+	e1:SetCountLimit(1,id)
+	e1:SetCost(s.spcost)
+	e1:SetTarget(s.sptg)
+	e1:SetOperation(s.spop)
 	c:RegisterEffect(e1)
-
-	-------------------------------------------------
-	-- ATK/DEF = sum of materials
-	-------------------------------------------------
-	local e2=Effect.CreateEffect(c)
-	e2:SetType(EFFECT_TYPE_SINGLE)
-	e2:SetCode(EFFECT_SET_ATTACK_FINAL)
-	e2:SetProperty(EFFECT_FLAG_SINGLE_RANGE)
-	e2:SetRange(LOCATION_MZONE)
-	e2:SetValue(s.atkval)
-	c:RegisterEffect(e2)
-
-	local e3=e2:Clone()
-	e3:SetCode(EFFECT_SET_DEFENSE_FINAL)
-	e3:SetValue(s.defval)
-	c:RegisterEffect(e3)
-
-	-------------------------------------------------
-	-- Unaffected
-	-------------------------------------------------
-	local e4=Effect.CreateEffect(c)
-	e4:SetType(EFFECT_TYPE_SINGLE)
-	e4:SetProperty(EFFECT_FLAG_SINGLE_RANGE)
-	e4:SetRange(LOCATION_MZONE)
-	e4:SetCode(EFFECT_IMMUNE_EFFECT)
-	e4:SetValue(s.immfilter)
-	c:RegisterEffect(e4)
-
-	-------------------------------------------------
-	-- (2) Negate (ONCE PER CHAIN REAL)
-	-------------------------------------------------
-	local e5=Effect.CreateEffect(c)
-	e5:SetDescription(aux.Stringid(id,1))
-	e5:SetCategory(CATEGORY_NEGATE+CATEGORY_DESTROY)
-	e5:SetType(EFFECT_TYPE_QUICK_O)
-	e5:SetCode(EVENT_CHAINING)
-	e5:SetProperty(EFFECT_FLAG_DAMAGE_STEP+EFFECT_FLAG_DAMAGE_CAL)
-	e5:SetRange(LOCATION_MZONE)
-	e5:SetCountLimit(1,EFFECT_COUNT_CODE_CHAIN) -- 🔥 CLAVE
-	e5:SetCondition(s.negcon)
-	e5:SetTarget(s.negtg)
-	e5:SetOperation(s.negop)
-	c:RegisterEffect(e5)
 	
-	-------------------------------------------------
-	-- Destroy → banish
-	-------------------------------------------------
-	local e7=Effect.CreateEffect(c)
-	e7:SetType(EFFECT_TYPE_SINGLE)
-	e7:SetCode(EFFECT_BATTLE_DESTROY_REDIRECT)
-	e7:SetValue(LOCATION_REMOVED)
-	c:RegisterEffect(e7)
-
-	local e8=Effect.CreateEffect(c)
-	e8:SetType(EFFECT_TYPE_SINGLE)
-	e8:SetCode(EFFECT_LEAVE_FIELD_REDIRECT)
-	e8:SetProperty(EFFECT_FLAG_CANNOT_DISABLE)
-	e8:SetCondition(s.rdcon)
-	e8:SetValue(LOCATION_REMOVED)
-	c:RegisterEffect(e8)
-
-	-------------------------------------------------
-	-- 🔥 STORE MATERIAL STATS (FIX REAL)
-	-------------------------------------------------
-	local e9=Effect.CreateEffect(c)
-	e9:SetType(EFFECT_TYPE_SINGLE+EFFECT_TYPE_CONTINUOUS)
-	e9:SetCode(EVENT_SPSUMMON_SUCCESS)
-	e9:SetOperation(s.statop)
-	c:RegisterEffect(e9)
+	-- Efecto 2: Sustitución de destierro desde el GY
+	local e2=Effect.CreateEffect(c)
+	e2:SetType(EFFECT_TYPE_FIELD+EFFECT_TYPE_CONTINUOUS)
+	e2:SetCode(EFFECT_SEND_REPLACE)
+	e2:SetRange(LOCATION_GRAVE)
+	e2:SetCountLimit(1,id+100)
+	e2:SetTarget(s.reptg)
+	e2:SetValue(s.repval)
+	e2:SetOperation(s.repop)
+	c:RegisterEffect(e2)
 end
 
--------------------------------------------------
--- Filters
--------------------------------------------------
-function s.matfilter(c)
-	return c:IsSetCard(0x3e8) and c:IsType(TYPE_MONSTER)
+-- Filtro para el costo (descartar 1)
+function s.spcost(e,tp,eg,ep,ev,re,r,rp,chk)
+	if chk==0 then return Duel.IsExistingMatchingCard(Card.IsDiscardable,tp,LOCATION_HAND,0,1,e:GetHandler()) end
+	Duel.DiscardHand(tp,Card.IsDiscardable,1,1,REASON_COST+REASON_DISCARD)
 end
 
-function s.cfilter(c)
-	return c:IsSetCard(0x3e8)
-		and c:IsType(TYPE_MONSTER)
-		and c:IsAbleToGraveAsCost()
+-- Filtro para Aesir que fue invocado por Sincronía
+function s.spfilter(c,e,tp)
+	return c:IsFaceup() and c:IsSetCard(0x4b) 
+		and c:IsSummonType(SUMMON_TYPE_SYNCHRO)
+		and c:IsCanBeSpecialSummoned(e,0,tp,false,false)
 end
 
--------------------------------------------------
--- 🔥 CALCULAR STATS CORRECTAMENTE
--------------------------------------------------
-function s.statop(e,tp,eg,ep,ev,re,r,rp)
+function s.sptg(e,tp,eg,ep,ev,re,r,rp,chk,chkc)
+	if chkc then return chkc:IsLocation(LOCATION_REMOVED) and chkc:IsControler(tp) and s.spfilter(chkc,e,tp) end
+	if chk==0 then return Duel.GetLocationCount(tp,LOCATION_MZONE)>0 
+		and Duel.IsExistingTarget(s.spfilter,tp,LOCATION_REMOVED,0,1,nil,e,tp) end
+	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_SPSUMMON)
+	local g=Duel.SelectTarget(tp,s.spfilter,tp,LOCATION_REMOVED,0,1,1,nil,e,tp)
+	Duel.SetOperationInfo(0,CATEGORY_SPECIAL_SUMMON,g,1,0,0)
+end
+
+function s.spop(e,tp,eg,ep,ev,re,r,rp)
+	local tc=Duel.GetFirstTarget()
+	if tc:IsRelateToEffect(e) then
+		Duel.SpecialSummon(tc,0,tp,tp,false,false,POS_FACEUP)
+	end
+end
+
+-- Lógica de sustitución (Efecto 2)
+function s.repfilter(c,tp)
+	return c:IsControler(tp) and c:IsLocation(LOCATION_ONFIELD+LOCATION_GRAVE) 
+		and c:IsSetCard(0x4b) and c:IsDestination(LOCATION_REMOVED) and not c:IsReason(REASON_REPLACE)
+end
+
+function s.reptg(e,tp,eg,ep,ev,re,r,rp,chk)
 	local c=e:GetHandler()
-	local mg=c:GetMaterial()
-	if not mg or #mg==0 then return end
-
-	local atk,def=0,0
-
-	for tc in aux.Next(mg) do
-		local a=tc:GetPreviousAttackOnField()
-		local d=tc:GetPreviousDefenseOnField()
-
-		atk=atk+math.max(a,0)
-		def=def+math.max(d,0)
-	end
-
-	c:RegisterFlagEffect(id,RESET_EVENT+RESETS_STANDARD,0,1,atk)
-	c:RegisterFlagEffect(id+1,RESET_EVENT+RESETS_STANDARD,0,1,def)
+	if chk==0 then return c:IsAbleToRemove() and eg:IsExists(s.repfilter,1,nil,tp) end
+	return Duel.SelectEffectYesNo(tp,c,aux.Stringid(id,1))
 end
 
-function s.atkval(e,c)
-	return c:GetFlagEffectLabel(id) or 0
+function s.repval(e,c)
+	return s.repfilter(c,e:GetHandlerPlayer())
 end
 
-function s.defval(e,c)
-	return c:GetFlagEffectLabel(id+1) or 0
-end
-
--------------------------------------------------
--- Chain lock
--------------------------------------------------
-function s.sumsuc(e,tp,eg,ep,ev,re,r,rp)
-	Duel.SetChainLimitTillChainEnd(aux.FALSE)
-end
-
--------------------------------------------------
--- Burn
--------------------------------------------------
-function s.burncon(e,tp,eg,ep,ev,re,r,rp)
-	return e:GetHandler():IsSummonLocation(LOCATION_EXTRA)
-end
-
-function s.rmfilter(c)
-	return c:IsAbleToRemove()
-end
-
-function s.burntg(e,tp,eg,ep,ev,re,r,rp,chk)
-	local g=Duel.GetMatchingGroup(s.rmfilter,tp,0,LOCATION_MZONE+LOCATION_GRAVE,nil)
-	if chk==0 then return #g>0 end
-	Duel.SetOperationInfo(0,CATEGORY_REMOVE,g,#g,0,0)
-	Duel.SetOperationInfo(0,CATEGORY_DAMAGE,nil,0,1-tp,#g*500)
-end
-
-function s.burnop(e,tp,eg,ep,ev,re,r,rp)
-	local g=Duel.GetMatchingGroup(s.rmfilter,tp,0,LOCATION_MZONE+LOCATION_GRAVE,nil)
-	local ct=Duel.Remove(g,POS_FACEUP,REASON_EFFECT)
-	if ct>0 then
-		Duel.Damage(1-tp,ct*500,REASON_EFFECT)
-	end
-end
-
--------------------------------------------------
--- Immunity
--------------------------------------------------
-function s.immfilter(e,te)
-	return te:GetOwner()~=e:GetHandler()
-end
-
--------------------------------------------------
--- Negate
--------------------------------------------------
-function s.negcon(e,tp,eg,ep,ev,re,r,rp)
-	return rp~=tp 
-		and Duel.IsChainNegatable(ev)
-		and not e:GetHandler():IsStatus(STATUS_BATTLE_DESTROYED)
-end
-
-function s.negtg(e,tp,eg,ep,ev,re,r,rp,chk)
-	if chk==0 then return true end
-	Duel.SetOperationInfo(0,CATEGORY_NEGATE,eg,1,0,0)
-	Duel.SetOperationInfo(0,CATEGORY_DESTROY,eg,1,0,0)
-end
-
-function s.negop(e,tp,eg,ep,ev,re,r,rp)
-	if Duel.NegateActivation(ev) then
-		Duel.Destroy(re:GetHandler(),REASON_EFFECT)
-	end
-end
-
--------------------------------------------------
--- Redirect
--------------------------------------------------
-function s.rdcon(e,tp,eg,ep,ev,re,r,rp)
-	return r&REASON_DESTROY~=0
+function s.repop(e,tp,eg,ep,ev,re,r,rp)
+	Duel.Remove(e:GetHandler(),POS_FACEUP,REASON_EFFECT+REASON_REPLACE)
 end

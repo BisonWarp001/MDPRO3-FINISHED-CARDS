@@ -1,101 +1,95 @@
 -- Aura of Despair
 local s,id=GetID()
 function s.initial_effect(c)
-	-- Mencionar a Dreadroot (Original y Custom)
-	aux.AddCodeList(c,62180201,111110200)
-	
-	-- (1) Activar: Negar efectos (Basado en ATK de Dreadroot)
-	local e1=Effect.CreateEffect(c)
-	e1:SetDescription(aux.Stringid(id,0))
-	e1:SetCategory(CATEGORY_DISABLE)
-	e1:SetType(EFFECT_TYPE_ACTIVATE)
-	e1:SetCode(EVENT_FREE_CHAIN)
-	e1:SetProperty(EFFECT_FLAG_CANNOT_INACTIVATE+EFFECT_FLAG_CANNOT_DISABLE+EFFECT_FLAG_CAN_FORBIDDEN+EFFECT_FLAG_CARD_TARGET)
-	e1:SetHintTiming(TIMINGS_CHECK_MONSTER,TIMINGS_CHECK_MONSTER+TIMING_END_PHASE)
-	e1:SetCountLimit(1,id)
-	e1:SetTarget(s.negtg)
-	e1:SetOperation(s.negop)
-	c:RegisterEffect(e1)
-
-	-- (2) GY Effect: Reducción masiva de ATK/DEF
-	local e2=Effect.CreateEffect(c)
-	e2:SetDescription(aux.Stringid(id,1))
-	e2:SetCategory(CATEGORY_ATKCHANGE+CATEGORY_DEFCHANGE)
-	e2:SetType(EFFECT_TYPE_QUICK_O)
-	e2:SetCode(EVENT_FREE_CHAIN)
-	e2:SetRange(LOCATION_GRAVE)
-	e2:SetProperty(EFFECT_FLAG_CARD_TARGET)
-	e2:SetCountLimit(1,id+100)
-	e2:SetCost(aux.bfgcost)
-	e2:SetTarget(s.atktg)
-	e2:SetOperation(s.atkop)
-	c:RegisterEffect(e2)
+    -- Mencionar a Dreadroot (Original y Custom)
+    aux.AddCodeList(c,62180201)
+    -- Activar
+    local e1=Effect.CreateEffect(c)
+    e1:SetCategory(CATEGORY_DISABLE+CATEGORY_REMOVE)
+    e1:SetType(EFFECT_TYPE_ACTIVATE)
+    e1:SetCode(EVENT_FREE_CHAIN)
+    -- Propiedades exactas de Fist of Fate (No puede ser negada)
+    e1:SetProperty(EFFECT_FLAG_CARD_TARGET+EFFECT_FLAG_CANNOT_INACTIVATE+EFFECT_FLAG_CANNOT_DISABLE+EFFECT_FLAG_CAN_FORBIDDEN)
+    e1:SetHintTiming(0,TIMINGS_CHECK_MONSTER+TIMING_END_PHASE)
+    e1:SetCountLimit(1,id+EFFECT_COUNT_CODE_OATH)
+    e1:SetTarget(s.target)
+    e1:SetOperation(s.activate)
+    c:RegisterEffect(e1)
 end
 
--- Filtro para Dreadroot (Añadido ID Custom)
+-- Filtro para Dreadroot (IDs específicos)
 function s.dreadfilter(c)
-	return c:IsFaceup() and (c:IsCode(62180201) or c:IsCode(111110200))
+    return c:IsFaceup() and (c:IsOriginalCodeRule(62180201))
 end
 
--------------------------------------------------
--- EFECTO 1: NEGACIÓN
--------------------------------------------------
-function s.negtg(e,tp,eg,ep,ev,re,r,rp,chk,chkc)
-	if chkc then return chkc:IsLocation(LOCATION_MZONE) and chkc:IsControler(tp) and s.dreadfilter(chkc) end
-	if chk==0 then return Duel.IsExistingTarget(s.dreadfilter,tp,LOCATION_MZONE,0,1,nil)
-		and Duel.IsExistingMatchingCard(Card.IsFaceup,tp,0,LOCATION_MZONE,1,nil) end
-	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_TARGET)
-	Duel.SelectTarget(tp,s.dreadfilter,tp,LOCATION_MZONE,0,1,1,nil)
+function s.target(e,tp,eg,ep,ev,re,r,rp,chk,chkc)
+    if chkc then return chkc:IsControler(tp) and chkc:IsLocation(LOCATION_MZONE) and s.dreadfilter(chkc) end
+    if chk==0 then return Duel.IsExistingTarget(s.dreadfilter,tp,LOCATION_MZONE,0,1,nil) end
+    Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_TARGET)
+    Duel.SelectTarget(tp,s.dreadfilter,tp,LOCATION_MZONE,0,1,1,nil)
+    Duel.SetOperationInfo(0,CATEGORY_DISABLE,nil,1,1-tp,LOCATION_MZONE)
 end
 
-function s.negop(e,tp,eg,ep,ev,re,r,rp)
-	local tc=Duel.GetFirstTarget()
-	if not tc or not tc:IsRelateToEffect(e) or tc:IsFacedown() then return end
-	
-	local atk=tc:GetAttack()
-	-- Filtra monstruos del oponente con menos ATK que Dreadroot
-	local g=Duel.GetMatchingGroup(Card.IsFaceup,tp,0,LOCATION_MZONE,nil)
-	local dg=g:Filter(function(bc) return bc:GetAttack()<atk end,nil)
-	
-	for nc in aux.Next(dg) do
-		local e1=Effect.CreateEffect(e:GetHandler())
-		e1:SetType(EFFECT_TYPE_SINGLE)
-		e1:SetCode(EFFECT_DISABLE)
-		e1:SetReset(RESET_EVENT+RESETS_STANDARD+RESET_PHASE+PHASE_END)
-		nc:RegisterEffect(e1)
-		local e2=e1:Clone()
-		e2:SetCode(EFFECT_DISABLE_EFFECT)
-		nc:RegisterEffect(e2)
-	end
-end
+function s.activate(e,tp,eg,ep,ev,re,r,rp)
+    local tc=Duel.GetFirstTarget()
+    if not tc or not tc:IsRelateToEffect(e) or tc:IsFacedown() then return end
+    
+    local atk=tc:GetAttack()
+    -- Filtrar monstruos del oponente con menor ATK actual
+    local g=Duel.GetMatchingGroup(Card.IsFaceup,tp,0,LOCATION_MZONE,nil):Filter(function(c) return c:GetAttack()<atk end,nil)
+    
+    if #g>0 then
+        for nc in aux.Next(g) do
+            -- Negar efectos en campo
+            local e1=Effect.CreateEffect(e:GetHandler())
+            e1:SetType(EFFECT_TYPE_SINGLE)
+            e1:SetProperty(EFFECT_FLAG_CANNOT_DISABLE)
+            e1:SetCode(EFFECT_DISABLE)
+            e1:SetReset(RESET_EVENT+RESETS_STANDARD+RESET_PHASE+PHASE_END)
+            nc:RegisterEffect(e1)
+            local e2=e1:Clone()
+            e2:SetCode(EFFECT_DISABLE_EFFECT)
+            nc:RegisterEffect(e2)
+            
+            -- No pueden ser tributados
+            local e3=Effect.CreateEffect(e:GetHandler())
+            e3:SetType(EFFECT_TYPE_SINGLE)
+            e3:SetProperty(EFFECT_FLAG_CANNOT_DISABLE)
+            e3:SetCode(EFFECT_UNRELEASABLE_SUM)
+            e3:SetValue(1)
+            e3:SetReset(RESET_EVENT+RESETS_STANDARD+RESET_PHASE+PHASE_END)
+            nc:RegisterEffect(e3)
+            local e4=e3:Clone() e4:SetCode(EFFECT_UNRELEASABLE_NONSUM) nc:RegisterEffect(e4)
+            
+            -- No pueden ser materiales de Extra Deck
+            local e5=Effect.CreateEffect(e:GetHandler())
+            e5:SetType(EFFECT_TYPE_SINGLE)
+            e5:SetProperty(EFFECT_FLAG_CANNOT_DISABLE)
+            e5:SetCode(EFFECT_CANNOT_BE_FUSION_MATERIAL)
+            e5:SetValue(1)
+            e5:SetReset(RESET_EVENT+RESETS_STANDARD+RESET_PHASE+PHASE_END)
+            nc:RegisterEffect(e5)
+            local e6=e5:Clone() e6:SetCode(EFFECT_CANNOT_BE_SYNCHRO_MATERIAL) nc:RegisterEffect(e6)
+            local e7=e5:Clone() e7:SetCode(EFFECT_CANNOT_BE_XYZ_MATERIAL) nc:RegisterEffect(e7)
+            local e8=e5:Clone() e8:SetCode(EFFECT_CANNOT_BE_LINK_MATERIAL) nc:RegisterEffect(e8)
+        end
+        Duel.AdjustInstantly()
+    end
 
--------------------------------------------------
--- EFECTO 2: REDUCCIÓN
--------------------------------------------------
-function s.atktg(e,tp,eg,ep,ev,re,r,rp,chk,chkc)
-	if chkc then return chkc:IsLocation(LOCATION_MZONE) and chkc:IsControler(tp) and s.dreadfilter(chkc) end
-	if chk==0 then return Duel.IsExistingTarget(s.dreadfilter,tp,LOCATION_MZONE,0,1,nil)
-		and Duel.IsExistingMatchingCard(Card.IsFaceup,tp,0,LOCATION_MZONE,1,nil) end
-	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_TARGET)
-	Duel.SelectTarget(tp,s.dreadfilter,tp,LOCATION_MZONE,0,1,1,nil)
-end
-
-function s.atkop(e,tp,eg,ep,ev,re,r,rp)
-	local tc=Duel.GetFirstTarget()
-	if not tc or not tc:IsRelateToEffect(e) or tc:IsFacedown() then return end
-	
-	local val=tc:GetAttack()
-	local g=Duel.GetMatchingGroup(Card.IsFaceup,tp,0,LOCATION_MZONE,nil)
-	
-	for nc in aux.Next(g) do
-		local e1=Effect.CreateEffect(e:GetHandler())
-		e1:SetType(EFFECT_TYPE_SINGLE)
-		e1:SetCode(EFFECT_UPDATE_ATTACK)
-		e1:SetValue(-val)
-		e1:SetReset(RESET_EVENT+RESETS_STANDARD+RESET_PHASE+PHASE_END) -- Añadido Phase End para balance
-		nc:RegisterEffect(e1)
-		local e2=e1:Clone()
-		e2:SetCode(EFFECT_UPDATE_DEFENSE)
-		nc:RegisterEffect(e2)
-	end
+    -- Efecto adicional Main Phase (Banish del Extra Deck)
+    if Duel.GetTurnPlayer()==tp and (Duel.GetCurrentPhase()==PHASE_MAIN1 or Duel.GetCurrentPhase()==PHASE_MAIN2) then
+        local exg=Duel.GetFieldGroup(tp,0,LOCATION_EXTRA)
+        -- Solo si hay cartas con menos ATK que el Dreadroot objetivo
+        local resg=exg:Filter(function(c,matk) return c:GetAttack()<matk end,nil,tc:GetAttack())
+        if #resg>0 and Duel.SelectYesNo(tp,aux.Stringid(id,0)) then
+            Duel.BreakEffect()
+            Duel.ConfirmCards(tp,exg)
+            Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_REMOVE)
+            local sg=resg:Select(tp,1,1,nil)
+            if #sg>0 then
+                Duel.Remove(sg,POS_FACEUP,REASON_EFFECT)
+            end
+            Duel.ShuffleExtra(1-tp)
+        end
+    end
 end

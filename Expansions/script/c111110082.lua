@@ -2,7 +2,7 @@
 local s,id=GetID()
 function s.initial_effect(c)
 	-- Mención de Avatar (Oficial y Custom)
-	aux.AddCodeList(c,21208154,111110201)
+	aux.AddCodeList(c,21208154)
 
 	-------------------------------------------------
 	-- (1) Activar: Inmunidad de Magia/Trampa
@@ -35,7 +35,7 @@ function s.initial_effect(c)
 end
 
 function s.avatarfilter(c)
-	return c:IsFaceup() and (c:IsCode(21208154) or c:IsCode(111110201))
+	return c:IsFaceup() and (c:IsCode(21208154))
 end
 
 -- (1) Lógica: Inmunidad
