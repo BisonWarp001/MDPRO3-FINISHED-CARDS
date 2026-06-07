@@ -41,10 +41,7 @@ end
 
 -- Level 10 DARK Fiend that cannot be Special Summoned
 function s.thfilter2(c)
-	return c:IsSummonableCard()
-		and c:IsRace(RACE_FIEND)
-		and c:IsAttribute(ATTRIBUTE_DARK)
-		and c:IsLevel(10)
+	return c:IsCode(62180201,21208154,57793869)
 		and c:IsAbleToHand()
 end
 

@@ -1,91 +1,125 @@
--- Total Submission
+-- Aura of Intimidation
 local s,id=GetID()
+
 function s.initial_effect(c)
-	-- Mencionar a Dreadroot (Original y Custom)
-	aux.AddCodeList(c,62180201,111110200)
-	
-	-------------------------------------------------
-	-- (1) Activar: Quick-Play Shuffle
-	-------------------------------------------------
+	aux.AddCodeList(c,62180201)
+
+	-- Activate
 	local e1=Effect.CreateEffect(c)
 	e1:SetDescription(aux.Stringid(id,0))
-	e1:SetCategory(CATEGORY_TODECK)
+	e1:SetCategory(CATEGORY_POSITION)
 	e1:SetType(EFFECT_TYPE_ACTIVATE)
 	e1:SetCode(EVENT_FREE_CHAIN)
+	e1:SetProperty(EFFECT_FLAG_CANNOT_INACTIVATE+EFFECT_FLAG_CANNOT_DISABLE+EFFECT_FLAG_CAN_FORBIDDEN)
 	e1:SetHintTiming(0,TIMINGS_CHECK_MONSTER+TIMING_END_PHASE)
 	e1:SetCountLimit(1,id+EFFECT_COUNT_CODE_OATH)
 	e1:SetCondition(s.condition)
 	e1:SetTarget(s.target)
 	e1:SetOperation(s.activate)
 	c:RegisterEffect(e1)
-	
-	-------------------------------------------------
-	-- (2) GY: Protección por sustitución (Protege de Eraser y rival)
-	-------------------------------------------------
-	local e2=Effect.CreateEffect(c)
-	e2:SetType(EFFECT_TYPE_FIELD+EFFECT_TYPE_CONTINUOUS)
-	e2:SetCode(EFFECT_DESTROY_SUBSTITUTE)
-	e2:SetRange(LOCATION_GRAVE)
-	e2:SetTarget(s.subtg)
-	e2:SetValue(s.subval)
-	c:RegisterEffect(e2)
 end
 
--- Filtro para Dreadroot (Incluye Custom)
-function s.cfilter(c)
-	return c:IsFaceup() and (c:IsCode(62180201) or c:IsCode(111110200))
+--------------------------------------------------
+-- Condition
+--------------------------------------------------
+
+function s.confilter(c)
+	return c:IsFaceup() and c:IsCode(62180201)
 end
 
--- (1) Lógica: Shuffle
 function s.condition(e,tp,eg,ep,ev,re,r,rp)
-	return Duel.IsExistingMatchingCard(s.cfilter,tp,LOCATION_MZONE,0,1,nil)
+	return Duel.IsExistingMatchingCard(s.confilter,tp,LOCATION_MZONE,0,1,nil)
 end
-function s.filter(c,atk)
-	return c:IsFaceup() and c:GetAttack()<atk and c:IsAbleToDeck()
+
+--------------------------------------------------
+-- Position Change
+--------------------------------------------------
+
+function s.posfilter(c)
+	return c:IsFaceup() and c:IsCanTurnSet()
 end
+
 function s.target(e,tp,eg,ep,ev,re,r,rp,chk)
-	local g1=Duel.GetMatchingGroup(s.cfilter,tp,LOCATION_MZONE,0,nil)
 	if chk==0 then
-		if #g1==0 then return false end
-		local max_atk=g1:GetMaxGroup(Card.GetAttack):GetFirst():GetAttack()
-		return Duel.IsExistingMatchingCard(s.filter,tp,0,LOCATION_MZONE,1,nil,max_atk)
+		return Duel.IsExistingMatchingCard(s.posfilter,tp,0,LOCATION_MZONE,1,nil)
 	end
-	local max_atk=g1:GetMaxGroup(Card.GetAttack):GetFirst():GetAttack()
-	local g2=Duel.GetMatchingGroup(s.filter,tp,0,LOCATION_MZONE,nil,max_atk)
-	Duel.SetOperationInfo(0,CATEGORY_TODECK,g2,#g2,0,0)
+
+	local g=Duel.GetMatchingGroup(s.posfilter,tp,0,LOCATION_MZONE,nil)
+	Duel.SetOperationInfo(0,CATEGORY_POSITION,g,#g,0,0)
 end
+
+--------------------------------------------------
+-- Attack Restriction
+--------------------------------------------------
+
+function s.regop(e,tp,eg,ep,ev,re,r,rp)
+	local tc=eg:GetFirst()
+	if not tc or not tc:IsControler(tp) then return end
+
+	Duel.RegisterFlagEffect(tp,id,RESET_PHASE|PHASE_END,0,1)
+
+	local e1=Effect.CreateEffect(e:GetHandler())
+	e1:SetType(EFFECT_TYPE_FIELD)
+	e1:SetCode(EFFECT_CANNOT_ATTACK_ANNOUNCE)
+	e1:SetProperty(EFFECT_FLAG_IGNORE_IMMUNE)
+	e1:SetTargetRange(LOCATION_MZONE,0)
+	e1:SetTarget(function(e,c) return c~=tc end)
+	e1:SetReset(RESET_PHASE|PHASE_END)
+	Duel.RegisterEffect(e1,tp)
+end
+
+--------------------------------------------------
+-- Activate
+--------------------------------------------------
+
 function s.activate(e,tp,eg,ep,ev,re,r,rp)
-	local g1=Duel.GetMatchingGroup(s.cfilter,tp,LOCATION_MZONE,0,nil)
-	if #g1==0 then return end
-	local max_atk=g1:GetMaxGroup(Card.GetAttack):GetFirst():GetAttack()
-	local g2=Duel.GetMatchingGroup(s.filter,tp,0,LOCATION_MZONE,nil,max_atk)
-	if #g2>0 then
-		Duel.SendtoDeck(g2,nil,SEQ_DECKSHUFFLE,REASON_EFFECT)
+	local g=Duel.GetMatchingGroup(s.posfilter,tp,0,LOCATION_MZONE,nil)
+	if #g==0 then return end
+
+	if Duel.ChangePosition(g,POS_FACEDOWN_DEFENSE)==0 then return end
+
+	local og=Duel.GetOperatedGroup()
+	local fg=og:Filter(Card.IsPosition,nil,POS_FACEDOWN_DEFENSE)
+
+	local tc=fg:GetFirst()
+	while tc do
+		local e1=Effect.CreateEffect(e:GetHandler())
+		e1:SetType(EFFECT_TYPE_SINGLE)
+		e1:SetCode(EFFECT_CANNOT_CHANGE_POSITION)
+		e1:SetReset(RESET_EVENT|RESETS_STANDARD|RESET_PHASE|PHASE_END)
+		tc:RegisterEffect(e1)
+		tc=fg:GetNext()
 	end
-end
 
--- (2) Lógica: GY Effect
--- Filtro para Dreadroot (Incluye Custom)
-function s.cfilter(c)
-	return c:IsFaceup() and (c:IsCode(62180201) or c:IsCode(111110200))
-end
+	local ph=Duel.GetCurrentPhase()
 
--- Lógica de Sustitución
-function s.subfilter(c,tp)
-	return c:IsControler(tp) and c:IsLocation(LOCATION_MZONE) 
-		and s.cfilter(c) and c:IsFaceup() and not c:IsReason(REASON_REPLACE)
-end
+	if Duel.GetTurnPlayer()~=tp then return end
+	if ph~=PHASE_MAIN1 and ph~=PHASE_MAIN2 then return end
 
-function s.subtg(e,tp,eg,ep,ev,re,r,rp,chk)
-	if chk==0 then return eg:IsExists(s.subfilter,1,nil,tp) 
-		and e:GetHandler():IsAbleToRemove() end
-	if Duel.SelectEffectYesNo(tp,e:GetHandler(),aux.Stringid(id,1)) then
-		Duel.Remove(e:GetHandler(),POS_FACEUP,REASON_EFFECT)
-		return true
+	if not Duel.SelectEffectYesNo(tp,e:GetHandler(),aux.Stringid(id,1)) then
+		return
 	end
-	return false
-end
 
-function s.subval(e,c)
-	return s.subfilter(c,e:GetHandlerPlayer())
+	Duel.BreakEffect()
+
+	-- All your monsters can attack directly
+	local mg=Duel.GetMatchingGroup(aux.TRUE,tp,LOCATION_MZONE,0,nil)
+
+	local mc=mg:GetFirst()
+	while mc do
+		local e2=Effect.CreateEffect(e:GetHandler())
+		e2:SetType(EFFECT_TYPE_SINGLE)
+		e2:SetCode(EFFECT_DIRECT_ATTACK)
+		e2:SetReset(RESET_EVENT|RESETS_STANDARD|RESET_PHASE|PHASE_END)
+		mc:RegisterEffect(e2)
+		mc=mg:GetNext()
+	end
+
+	-- Only 1 monster can attack this turn
+	local e3=Effect.CreateEffect(e:GetHandler())
+	e3:SetType(EFFECT_TYPE_FIELD|EFFECT_TYPE_CONTINUOUS)
+	e3:SetCode(EVENT_ATTACK_ANNOUNCE)
+	e3:SetOperation(s.regop)
+	e3:SetReset(RESET_PHASE|PHASE_END)
+	Duel.RegisterEffect(e3,tp)
 end

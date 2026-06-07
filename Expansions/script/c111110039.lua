@@ -1,11 +1,9 @@
 local s,id=GetID()
 s.listed_series={0x42,0x4b}
-s.listed_names={111110040,93483212}
 
 function s.initial_effect(c)
 
-	aux.AddCodeList(c,111110040)
-	aux.AddCodeList(c,93483212)
+	aux.AddCodeList(c,111110040,93483212)
 
 	-------------------------------------------------
 	-- ① Set Valhalla (HOPT #1)

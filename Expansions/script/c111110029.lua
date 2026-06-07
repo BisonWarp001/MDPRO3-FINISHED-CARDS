@@ -1,7 +1,7 @@
 --Ragnarok Peak - Aesir God Odin
 local s,id=GetID()
 function s.initial_effect(c)
-
+	aux.AddCodeList(c,93483212)
 	-- Xyz Summon
 	aux.AddXyzProcedure(c,nil,10,2)
 	c:EnableReviveLimit()

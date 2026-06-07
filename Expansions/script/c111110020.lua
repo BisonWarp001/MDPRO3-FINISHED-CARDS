@@ -2,7 +2,7 @@
 local s,id=GetID()
 
 function s.initial_effect(c)
-	aux.IsCodeListed(c,10000000)
+	aux.AddCodeList(c,10000000)
     -------------------------------------------------
     -- ① If added to hand (except draw): SS (HOPT id)
     -------------------------------------------------
@@ -75,11 +75,16 @@ end
 function s.tktg(e,tp,eg,ep,ev,re,r,rp,chk)
     local c=e:GetHandler()
     local ft=Duel.GetLocationCount(tp,LOCATION_MZONE)
+
+    local max=math.min(2,ft,math.floor(c:GetAttack()/1000))
+
     if chk==0 then
-        return c:IsFaceup() and ft>0
+        return c:IsFaceup()
+            and max>0
             and Duel.IsPlayerCanSpecialSummonMonster(tp,111110021,0,TYPES_TOKEN,500,500,1,RACE_AQUA,ATTRIBUTE_WATER)
     end
-    Duel.SetOperationInfo(0,CATEGORY_SPECIAL_SUMMON,nil,1,tp,LOCATION_MZONE)
+
+    Duel.SetOperationInfo(0,CATEGORY_SPECIAL_SUMMON,nil,max,tp,LOCATION_MZONE)
 end
 
 function s.tkop(e,tp,eg,ep,ev,re,r,rp)

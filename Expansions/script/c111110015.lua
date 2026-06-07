@@ -2,7 +2,7 @@
 local s,id=GetID()
 
 function s.initial_effect(c)
-	aux.IsCodeListed(c,10000020)
+	aux.AddCodeList(c,10000020)
 	-------------------------------------------------
 	-- Name becomes "Revival Jam"
 	-------------------------------------------------

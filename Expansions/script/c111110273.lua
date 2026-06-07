@@ -1,9 +1,9 @@
---Unleashed Divinity
+--Sun God Dragon 
 local s,id=GetID()
 
 function s.initial_effect(c)
 	-- Mención de los Dioses
-	aux.AddCodeList(c,10000000,10000010,10000020)
+	aux.AddCodeList(c,10000010)
 
 	-- Activación: No puede ser negada
 	local e1=Effect.CreateEffect(c)
@@ -20,7 +20,7 @@ end
 -------------------------------------------------
 function s.filter(c)
 	return c:IsFaceup()
-		and (c:IsCode(10000000) or c:IsCode(10000010) or c:IsCode(10000020))
+		and (c:IsCode(10000010))
 		and c:GetFlagEffect(id)==0
 end
 
@@ -61,10 +61,6 @@ function s.activate(e,tp,eg,ep,ev,re,r,rp)
 	-- Aplicar Efectos Ganados específicos
 	if tc:IsCode(10000010) then
 		s.apply_ra(tc,c)
-	elseif tc:IsCode(10000020) then
-		s.apply_slifer(tc,c)
-	elseif tc:IsCode(10000000) then
-		s.apply_obelisk(tc,c)
 	end
 end
 
@@ -199,107 +195,4 @@ end
 -- Función auxiliar: Deshabilita el ataque a cualquier monstruo que NO sea el dueño de este efecto (Ra)
 function s.atklimit(e,c)
 	return c~=e:GetOwner()
-end
-
-
--------------------------------------------------
--- SLIFER (MODIFICADO: Escudo de Segunda Boca Nerfeado)
--------------------------------------------------
-function s.apply_slifer(tc,c)
-	local e1=Effect.CreateEffect(c)
-	e1:SetDescription(aux.Stringid(id,2))
-	e1:SetType(EFFECT_TYPE_QUICK_O)
-	e1:SetCode(EVENT_FREE_CHAIN)
-	e1:SetRange(LOCATION_MZONE)
-	e1:SetCountLimit(1)
-	e1:SetHintTiming(0,TIMINGS_CHECK_MONSTER+TIMING_BATTLE_START+TIMING_ATTACK)
-	e1:SetCondition(s.slifercon)
-	e1:SetTarget(s.slifertg)
-	e1:SetOperation(s.sliferop)
-	e1:SetReset(RESET_EVENT+RESETS_STANDARD)
-	tc:RegisterEffect(e1,true)
-end
-
--- Condición estricta: Solo en el turno del oponente
-function s.slifercon(e,tp,eg,ep,ev,re,r,rp)
-	return Duel.GetTurnPlayer()~=tp
-end
-
--- Target: Solo permite activarse si Slifer está actualmente en Posición de Defensa
-function s.slifertg(e,tp,eg,ep,ev,re,r,rp,chk)
-	if chk==0 then return e:GetHandler():IsDefensePos() end
-end
-
--- Operación: Aplica la redirección de ataque si Slifer continúa en Defensa al resolver
-function s.sliferop(e,tp,eg,ep,ev,re,r,rp)
-	local c=e:GetHandler()
-	if c:IsRelateToEffect(e) and c:IsDefensePos() and c:IsFaceup() then
-		-- Crea una restricción global en el campo para bloquear objetivos de ataque
-		local e1=Effect.CreateEffect(c)
-		e1:SetType(EFFECT_TYPE_FIELD)
-		e1:SetCode(EFFECT_CANNOT_SELECT_BATTLE_TARGET)
-		e1:SetTargetRange(0,LOCATION_MZONE)
-		e1:SetValue(function(e,tc) return tc~=c end) -- Prohíbe elegir cualquier carta que no sea este Slifer
-		e1:SetReset(RESET_PHASE+PHASE_END)
-		Duel.RegisterEffect(e1,tp)
-		
-		-- Indicador visual en pantalla para avisar que el Escudo está activo
-		Duel.Hint(HINT_CARD,0,10000020)
-	end
-end
-
--------------------------------------------------
--- OBELISK
--------------------------------------------------
-function s.apply_obelisk(tc,c)
-	local e1=Effect.CreateEffect(c)
-	e1:SetDescription(aux.Stringid(id,3))
-	e1:SetCategory(CATEGORY_DESTROY+CATEGORY_ATKCHANGE+CATEGORY_DEFCHANGE)
-	e1:SetType(EFFECT_TYPE_QUICK_O)
-	e1:SetCode(EVENT_FREE_CHAIN)
-	e1:SetRange(LOCATION_MZONE)
-	e1:SetCountLimit(1)
-	e1:SetHintTiming(0,TIMINGS_CHECK_MONSTER+TIMING_MAIN_END+TIMING_BATTLE_START+TIMING_BATTLE_END)
-	e1:SetCondition(s.obcon)
-	e1:SetCost(s.obcost)
-	e1:SetTarget(s.obtg)
-	e1:SetOperation(s.obop)
-	e1:SetReset(RESET_EVENT+RESETS_STANDARD)
-	tc:RegisterEffect(e1,true)
-end
-
-function s.obcon(e,tp,eg,ep,ev,re,r,rp)
-	local ph=Duel.GetCurrentPhase()
-	return Duel.GetTurnPlayer()~=tp and (ph==PHASE_MAIN1 or ph==PHASE_MAIN2 or (ph>=PHASE_BATTLE_START and ph<=PHASE_BATTLE))
-end
-
-function s.obcost(e,tp,eg,ep,ev,re,r,rp,chk)
-	local c=e:GetHandler()
-	if chk==0 then return Duel.CheckReleaseGroup(tp,nil,2,c) end
-	local g=Duel.SelectReleaseGroup(tp,nil,2,2,c)
-	Duel.Release(g,REASON_COST)
-end
-
-function s.obtg(e,tp,eg,ep,ev,re,r,rp,chk)
-	if chk==0 then return Duel.IsExistingMatchingCard(nil,tp,0,LOCATION_MZONE,1,nil) end
-	local g=Duel.GetMatchingGroup(nil,tp,0,LOCATION_MZONE,nil)
-	Duel.SetOperationInfo(0,CATEGORY_DESTROY,g,#g,0,0)
-end
-
-function s.obop(e,tp,eg,ep,ev,re,r,rp)
-	local c=e:GetHandler()
-	local g=Duel.GetMatchingGroup(nil,tp,0,LOCATION_MZONE,nil)
-	if #g>0 and Duel.Destroy(g,REASON_EFFECT)>0 then
-		if c:IsRelateToEffect(e) and c:IsFaceup() then
-			local e1=Effect.CreateEffect(c)
-			e1:SetType(EFFECT_TYPE_SINGLE)
-			e1:SetCode(EFFECT_UPDATE_ATTACK)
-			e1:SetValue(4000)
-			e1:SetReset(RESET_EVENT+RESETS_STANDARD)
-			c:RegisterEffect(e1)
-			local e2=e1:Clone()
-			e2:SetCode(EFFECT_UPDATE_DEFENSE)
-			c:RegisterEffect(e2)
-		end
-	end
 end

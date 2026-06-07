@@ -1,103 +1,136 @@
--- Altar of the Wicked Divinities
-local s,id=GetID()
-s.listed_series={0x3f2}
+-- Altar of Jashin
+local s,id,o=GetID()
 function s.initial_effect(c)
-	-- Mencionar a los 3 Dioses Oscuros (Originales y Custom)
-	aux.AddCodeList(c,62180201,21208154,57793869)
-	
-	-- (0) Activación
+	aux.AddCodeList(c,21208154,57793869,62180201)
+	-- Activar la carta como Magia Continua
 	local e0=Effect.CreateEffect(c)
 	e0:SetType(EFFECT_TYPE_ACTIVATE)
 	e0:SetCode(EVENT_FREE_CHAIN)
-	e0:SetCountLimit(1,id+EFFECT_COUNT_CODE_OATH) 
+	e0:SetProperty(EFFECT_FLAG_CANNOT_DISABLE)
+	e0:SetCountLimit(1,id+EFFECT_COUNT_CODE_OATH) -- Solo puedes activar 1 "Altar of Jashin" por turno
 	c:RegisterEffect(e0)
-	
-	-- Protección: Primera vez que un Wicked (Demonio Nivel 10) fuera a ser destruido
-	local e1=Effect.CreateEffect(c)
-	e1:SetType(EFFECT_TYPE_FIELD)
-	e1:SetCode(EFFECT_INDESTRUCTABLE_COUNT)
-	e1:SetRange(LOCATION_SZONE)
-	e1:SetTargetRange(LOCATION_MZONE,LOCATION_MZONE)
-	e1:SetTarget(s.indtg)
-	e1:SetCountLimit(1)
-	e1:SetValue(s.indct)
-	c:RegisterEffect(e1)
 
-	-- (1) Búsqueda manual (Ignition)
+	-- (1) Protección ante Invocación por Tributo (Lógica basada en Meteor)
+	local e1=Effect.CreateEffect(c)
+	e1:SetType(EFFECT_TYPE_FIELD+EFFECT_TYPE_CONTINUOUS)
+	e1:SetRange(LOCATION_SZONE)
+	e1:SetCode(EVENT_SUMMON_SUCCESS)
+	e1:SetOperation(s.sucop)
+	c:RegisterEffect(e1)
 	local e2=Effect.CreateEffect(c)
-	e2:SetDescription(aux.Stringid(id,0))
-	e2:SetCategory(CATEGORY_TOHAND+CATEGORY_SEARCH+CATEGORY_HANDES)
-	e2:SetType(EFFECT_TYPE_IGNITION)
+	e2:SetType(EFFECT_TYPE_FIELD+EFFECT_TYPE_CONTINUOUS)
 	e2:SetRange(LOCATION_SZONE)
-	e2:SetCountLimit(1,id)
-	e2:SetTarget(s.thtg)
-	e2:SetOperation(s.thop)
+	e2:SetCode(EVENT_CHAIN_END)
+	e2:SetOperation(s.cedop)
 	c:RegisterEffect(e2)
-	
-	-- (2) Robo de cartas (Continuo)
+
+	-- (2) Una vez por turno: Añadir 1 monstruo "Jashin" del Deck a la mano
 	local e3=Effect.CreateEffect(c)
-	e3:SetType(EFFECT_TYPE_FIELD+EFFECT_TYPE_CONTINUOUS)
-	e3:SetCode(EVENT_SUMMON_SUCCESS)
+	e3:SetDescription(aux.Stringid(id,0))
+	e3:SetCategory(CATEGORY_TOHAND+CATEGORY_SEARCH)
+	e3:SetType(EFFECT_TYPE_IGNITION)
 	e3:SetRange(LOCATION_SZONE)
-	e3:SetCondition(s.drcon)
-	e3:SetOperation(s.drop)
-	e3:SetCountLimit(1,id+100)
+	e3:SetCountLimit(1) -- Una vez por turno
+	e3:SetTarget(s.thtg)
+	e3:SetOperation(s.thop)
 	c:RegisterEffect(e3)
 
-	local e4=e3:Clone()
-	e4:SetCode(EVENT_SPSUMMON_SUCCESS)
+	-- (3) Robar 2 cartas si se Invoca de Modo Normal a Avatar, Dreadroot o Eraser
+	local e4=Effect.CreateEffect(c)
+	e4:SetDescription(aux.Stringid(id,1))
+	e4:SetCategory(CATEGORY_DRAW)
+	e4:SetType(EFFECT_TYPE_FIELD+EFFECT_TYPE_TRIGGER_O)
+	e4:SetProperty(EFFECT_FLAG_PLAYER_TARGET+EFFECT_FLAG_DELAY)
+	e4:SetCode(EVENT_SUMMON_SUCCESS)
+	e4:SetRange(LOCATION_SZONE)
+	e4:SetCountLimit(1,id) -- Solo puedes usar este efecto de "Altar of Jashin" una vez por turno
+	e4:SetTarget(s.drtg)
+	e4:SetOperation(s.drop)
 	c:RegisterEffect(e4)
 end
 
---====================================
--- Protection logic (Cubre Custom y Originales)
---====================================
-function s.indtg(e,c)
-	-- Filtra Demonios de Nivel 10 (Los Wicked Gods originales y tus custom)
-	return c:IsFaceup() and c:IsRace(RACE_FIEND) and c:IsLevel(10)
-end
-function s.indct(e,re,r,rp)
-	return (r&REASON_DESTROY)~=0
+-- ====================================================================================
+-- LÓGICA DEL EFECTO (1): PROTECCIÓN ANTE INVOCACIÓN POR TRIBUTO
+-- ====================================================================================
+
+function s.chainlm(e,rp,tp)
+	return tp==rp -- El oponente no puede activar cartas (solo tú puedes encadenar)
 end
 
---====================================
--- Search "Wicked Divinities"
---====================================
+function s.sucfilter(c,tp)
+	return c:IsSummonType(SUMMON_TYPE_ADVANCE) and c:IsControler(tp)
+end
+
+function s.sucop(e,tp,eg,ep,ev,re,r,rp)
+	if not eg:IsExists(s.sucfilter,1,nil,tp) then return end
+	if Duel.GetCurrentChain()==0 then
+		Duel.SetChainLimitTillChainEnd(s.chainlm)
+	elseif Duel.GetCurrentChain()==1 then
+		Duel.RegisterFlagEffect(tp,id+o,RESET_EVENT+RESETS_STANDARD,0,1)
+		local e1=Effect.CreateEffect(e:GetHandler())
+		e1:SetType(EFFECT_TYPE_FIELD+EFFECT_TYPE_CONTINUOUS)
+		e1:SetCode(EVENT_CHAINING)
+		e1:SetOperation(s.resetop)
+		Duel.RegisterEffect(e1,tp)
+		local e2=e1:Clone()
+		e2:SetCode(EVENT_BREAK_EFFECT)
+		e2:SetReset(RESET_CHAIN)
+		Duel.RegisterEffect(e2,tp)
+	end
+end
+
+function s.resetop(e,tp,eg,ep,ev,re,r,rp)
+	Duel.ResetFlagEffect(tp,id+o*2)
+	e:Reset()
+end
+
+function s.cedop(e,tp,eg,ep,ev,re,r,rp)
+	if Duel.GetFlagEffect(tp,id+o*2)~=0 then
+		Duel.SetChainLimitTillChainEnd(s.chainlm)
+	end
+	Duel.ResetFlagEffect(tp,id+o*2)
+end
+
+-- ====================================================================================
+-- LÓGICA DEL EFECTO (2): BÚSQUEDA DEL ARQUETIPO "JASHIN" (0x3f2)
+-- ====================================================================================
+
 function s.thfilter(c)
 	return c:IsSetCard(0x3f2) and c:IsType(TYPE_MONSTER) and c:IsAbleToHand()
 end
+
 function s.thtg(e,tp,eg,ep,ev,re,r,rp,chk)
-	if chk==0 then 
-		return Duel.IsExistingMatchingCard(s.thfilter,tp,LOCATION_DECK,0,1,nil)
-	end
+	if chk==0 then return Duel.IsExistingMatchingCard(s.thfilter,tp,LOCATION_DECK,0,1,nil) end
 	Duel.SetOperationInfo(0,CATEGORY_TOHAND,nil,1,tp,LOCATION_DECK)
-	Duel.SetOperationInfo(0,CATEGORY_HANDES,nil,1,tp,LOCATION_HAND)
 end
+
 function s.thop(e,tp,eg,ep,ev,re,r,rp)
+	if not e:GetHandler():IsRelateToEffect(e) then return end
 	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_ATOHAND)
 	local g=Duel.SelectMatchingCard(tp,s.thfilter,tp,LOCATION_DECK,0,1,1,nil)
-	if #g>0 and Duel.SendtoHand(g,nil,REASON_EFFECT)>0 then
+	if #g>0 then
+		Duel.SendtoHand(g,nil,REASON_EFFECT)
 		Duel.ConfirmCards(1-tp,g)
-		Duel.BreakEffect()
-		if Duel.GetFieldGroupCount(tp,LOCATION_HAND,0)>0 then
-			Duel.DiscardHand(tp,Card.IsDiscardable,1,1,REASON_EFFECT+REASON_DISCARD)
-		end
 	end
 end
 
---====================================
--- Draw logic (Ajustado con IDs Custom)
---====================================
-function s.cfilter(c,tp)
-    -- Se activa con Avatar, Dreadroot o Eraser (Originales y IDs Custom)
-    return c:IsSummonPlayer(tp) and 
-        (c:IsCode(62180201) or c:IsCode(21208154) or c:IsCode(57793869))
+-- ====================================================================================
+-- LÓGICA DEL EFECTO (3): ROBO DE CARTAS (THE WICKED GODS)
+-- ====================================================================================
+
+function s.drfilter(c)
+	return c:IsFaceup() and (c:IsCode(21208154) or c:IsCode(57793869) or c:IsCode(62180201))
 end
 
-function s.drcon(e,tp,eg,ep,ev,re,r,rp)
-	return eg:IsExists(s.cfilter,1,nil,tp)
+function s.drtg(e,tp,eg,ep,ev,re,r,rp,chk)
+	if chk==0 then return eg:IsExists(s.drfilter,1,nil) and Duel.IsPlayerCanDraw(tp,2) end
+	Duel.SetTargetPlayer(tp)
+	Duel.SetTargetParam(2)
+	Duel.SetOperationInfo(0,CATEGORY_DRAW,nil,0,tp,2)
 end
+
 function s.drop(e,tp,eg,ep,ev,re,r,rp)
-	Duel.Hint(HINT_CARD,0,id)
-	Duel.Draw(tp,2,REASON_EFFECT)
+	if not e:GetHandler():IsRelateToEffect(e) then return end
+	local p,d=Duel.GetChainInfo(0,CHAININFO_TARGET_PLAYER,CHAININFO_TARGET_PARAM)
+	Duel.Draw(p,d,REASON_EFFECT)
 end

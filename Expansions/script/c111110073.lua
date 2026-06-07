@@ -89,7 +89,7 @@ function s.apply_avatar(tc,c)
 	e1:SetCountLimit(1)
 	e1:SetTarget(s.copy_tg)
 	e1:SetOperation(s.copy_op)
-	e1:SetReset(RESET_EVENT+RESETS_STANDARD)
+	e1:SetReset(RESET_EVENT+RESETS_STANDARD+RESET_PHASE+PHASE_END)
 	tc:RegisterEffect(e1,true)
 end
 
@@ -103,7 +103,7 @@ function s.copy_op(e,tp,eg,ep,ev,re,r,rp)
     Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_FACEUP)
     local g=Duel.SelectMatchingCard(tp,Card.IsType,tp,LOCATION_MZONE+LOCATION_GRAVE,LOCATION_MZONE+LOCATION_GRAVE,1,1,c,TYPE_EFFECT)
     local tc=g:GetFirst()
-    if tc and tc:IsFaceup() then
+    if tc and (tc:IsFaceup() or tc:IsLocation(LOCATION_GRAVE)) then
         Duel.MajesticCopy(c,tc)
         c:SetHint(CHINT_CARD,tc:GetCode())
         
@@ -114,47 +114,91 @@ function s.copy_op(e,tp,eg,ep,ev,re,r,rp)
 end
 
 -------------------------------------------------
--- ERASER: Negación "Choose"
+-- ERASER: Forced Battle + End Battle Phase
 -------------------------------------------------
 function s.apply_eraser(tc,c)
 	local e1=Effect.CreateEffect(c)
 	e1:SetDescription(aux.Stringid(id,2))
-	e1:SetCategory(CATEGORY_DISABLE)
 	e1:SetType(EFFECT_TYPE_QUICK_O)
 	e1:SetCode(EVENT_FREE_CHAIN)
 	e1:SetRange(LOCATION_MZONE)
 	e1:SetProperty(EFFECT_FLAG_CANNOT_DISABLE)
-	e1:SetHintTiming(0,TIMINGS_CHECK_MONSTER+TIMING_END_PHASE)
+	e1:SetHintTiming(TIMING_BATTLE_START,0)
 	e1:SetCountLimit(1)
-	e1:SetTarget(s.neg_tg)
-	e1:SetOperation(s.neg_op)
+	e1:SetCondition(s.bpcon)
+	e1:SetTarget(s.atk_tg)
+	e1:SetOperation(s.atk_op)
 	e1:SetReset(RESET_EVENT+RESETS_STANDARD)
 	tc:RegisterEffect(e1,true)
 end
 
-function s.neg_tg(e,tp,eg,ep,ev,re,r,rp,chk)
-	if chk==0 then return Duel.IsExistingMatchingCard(Card.IsFaceup,tp,0,LOCATION_MZONE,1,nil) end
+-- Only at the start of opponent's Battle Phase
+function s.bpcon(e,tp,eg,ep,ev,re,r,rp)
+	return Duel.GetTurnPlayer()~=tp
+		and Duel.GetCurrentPhase()==PHASE_BATTLE_START
 end
 
-function s.neg_op(e,tp,eg,ep,ev,re,r,rp)
-	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_FACEUP)
-	local g=Duel.SelectMatchingCard(tp,Card.IsFaceup,tp,0,LOCATION_MZONE,1,1,nil)
-	local tc=g:GetFirst()
-	if tc then
-		local e1=Effect.CreateEffect(e:GetHandler())
-		e1:SetType(EFFECT_TYPE_SINGLE)
-		e1:SetCode(EFFECT_DISABLE)
-		e1:SetReset(RESET_EVENT+RESETS_STANDARD+RESET_PHASE+PHASE_END)
-		tc:RegisterEffect(e1)
-		local e2=e1:Clone()
-		e2:SetCode(EFFECT_DISABLE_EFFECT)
-		tc:RegisterEffect(e2)
+function s.atk_tg(e,tp,eg,ep,ev,re,r,rp,chk)
+	if chk==0 then
+		return Duel.IsExistingMatchingCard(Card.IsAttackPos,tp,0,LOCATION_MZONE,1,nil)
 	end
 end
 
--------------------------------------------------
--- DREADROOT: Sentencia "Choose"
--------------------------------------------------
+function s.atk_op(e,tp,eg,ep,ev,re,r,rp)
+	local c=e:GetHandler()
+	if not c:IsRelateToEffect(e) or c:IsFacedown() then return end
+
+	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_FACEUP)
+	local g=Duel.SelectMatchingCard(tp,Card.IsAttackPos,tp,0,LOCATION_MZONE,1,1,nil)
+	local tc=g:GetFirst()
+	if not tc then return end
+
+	-- Selected monster must attack Eraser this turn
+	local e1=Effect.CreateEffect(c)
+	e1:SetType(EFFECT_TYPE_SINGLE)
+	e1:SetCode(EFFECT_MUST_ATTACK)
+	e1:SetReset(RESET_EVENT+RESETS_STANDARD+RESET_PHASE+PHASE_END)
+	tc:RegisterEffect(e1)
+
+	local e2=Effect.CreateEffect(c)
+	e2:SetType(EFFECT_TYPE_SINGLE)
+	e2:SetCode(EFFECT_MUST_ATTACK_MONSTER)
+	e2:SetValue(s.atklimit)
+	e2:SetReset(RESET_EVENT+RESETS_STANDARD+RESET_PHASE+PHASE_END)
+	tc:RegisterEffect(e2)
+
+	-- End Battle Phase immediately after that battle
+	local e3=Effect.CreateEffect(c)
+	e3:SetType(EFFECT_TYPE_FIELD+EFFECT_TYPE_CONTINUOUS)
+	e3:SetCode(EVENT_BATTLED)
+	e3:SetLabelObject(tc)
+	e3:SetOperation(s.endbp_op)
+	e3:SetReset(RESET_PHASE+PHASE_END)
+	Duel.RegisterEffect(e3,tp)
+end
+
+function s.atklimit(e,c)
+	return c==e:GetHandler()
+end
+
+function s.endbp_op(e,tp,eg,ep,ev,re,r,rp)
+	local tc=e:GetLabelObject()
+	local a=Duel.GetAttacker()
+	local d=Duel.GetAttackTarget()
+
+	if not tc then return end
+
+	-- If the selected monster battled Eraser
+	if (a==tc and d)
+		or (d==tc and a) then
+
+		Duel.EndBattlePhase()
+		e:Reset()
+	end
+end
+-------------------------------------------------------------------
+-- DREADROOT: Sentencia "Choose" (BLOQUE COMPLETO CORREGIDO)
+-------------------------------------------------------------------
 function s.apply_dreadroot(tc,c)
 	local e1=Effect.CreateEffect(c)
 	e1:SetDescription(aux.Stringid(id,3))
@@ -163,47 +207,70 @@ function s.apply_dreadroot(tc,c)
 	e1:SetCode(EVENT_FREE_CHAIN)
 	e1:SetRange(LOCATION_MZONE)
 	e1:SetProperty(EFFECT_FLAG_CANNOT_DISABLE)
-	e1:SetHintTiming(0,TIMINGS_CHECK_MONSTER+TIMING_END_PHASE)
+	-- Timing optimizado: Solo Main Phase y Battle Phase del rival
+	e1:SetHintTiming(0,TIMINGS_CHECK_MONSTER+TIMING_MAIN_END+TIMING_BATTLE_START+TIMING_BATTLE_PHASE)
 	e1:SetCountLimit(1)
+	e1:SetCondition(s.dreadcon)
 	e1:SetTarget(s.des_tg)
 	e1:SetOperation(s.des_op)
 	e1:SetReset(RESET_EVENT+RESETS_STANDARD)
 	tc:RegisterEffect(e1,true)
 end
 
+-- Condición de Fase: Solo Main o Battle Phase del oponente (Rango seguro de sub-fases)
+function s.dreadcon(e,tp,eg,ep,ev,re,r,rp)
+	if Duel.GetTurnPlayer()==tp then return false end
+	local ph=Duel.GetCurrentPhase()
+	return ph==PHASE_MAIN1 or ph==PHASE_MAIN2 
+		or (ph>=PHASE_BATTLE_START and ph<=PHASE_BATTLE)
+end
+
+-- Target: Verificar que exista al menos 1 monstruo en el campo del rival
 function s.des_tg(e,tp,eg,ep,ev,re,r,rp,chk)
 	if chk==0 then return Duel.IsExistingMatchingCard(nil,tp,0,LOCATION_MZONE,1,nil) end
 end
 
+-- Operación: Seleccionar al monstruo y marcarlo hasta el fin del turno
 function s.des_op(e,tp,eg,ep,ev,re,r,rp)
 	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_DESTROY)
 	local g=Duel.SelectMatchingCard(tp,nil,tp,0,LOCATION_MZONE,1,1,nil)
 	local tc=g:GetFirst()
 	if tc then
+		-- Registra la bandera visual en el monstruo del rival
+		tc:RegisterFlagEffect(id,RESET_EVENT+RESETS_STANDARD+RESET_PHASE+PHASE_END,EFFECT_FLAG_CLIENT_HINT,1,0,aux.Stringid(id,4))
+		
+		-- Crear el disparador global para la End Phase
 		local e1=Effect.CreateEffect(e:GetHandler())
 		e1:SetType(EFFECT_TYPE_FIELD+EFFECT_TYPE_CONTINUOUS)
 		e1:SetCode(EVENT_PHASE+PHASE_END)
 		e1:SetCountLimit(1)
-		e1:SetLabelObject(tc)
+		e1:SetLabelObject(e:GetHandler()) -- Guardamos a nuestro Dreadroot en el Label
 		e1:SetOperation(s.des_end_op)
 		e1:SetReset(RESET_PHASE+PHASE_END)
 		Duel.RegisterEffect(e1,tp)
-		tc:RegisterFlagEffect(id,RESET_EVENT+RESETS_STANDARD+RESET_PHASE+PHASE_END,EFFECT_FLAG_CLIENT_HINT,1,0,aux.Stringid(id,4))
 	end
 end
 
+-- Resolución en la End Phase: Destruir el monstruo marcado y absorber su ATK actual
 function s.des_end_op(e,tp,eg,ep,ev,re,r,rp)
-	local tc=e:GetLabelObject()
-	local c=e:GetOwner() 
-	if tc and tc:IsLocation(LOCATION_MZONE) then
-		local atk=tc:GetAttack()
-		if Duel.Destroy(tc,REASON_EFFECT)>0 and c:IsLocation(LOCATION_MZONE) and c:IsFaceup() then
-			local e1=Effect.CreateEffect(c)
+	local dread=e:GetLabelObject() -- Recuperamos a nuestro Dreadroot
+	
+	-- Buscar al monstruo en el campo del oponente que tenga la bandera asignada
+	local g=Duel.GetMatchingGroup(function(c) return c:GetFlagEffect(id)>0 end,tp,0,LOCATION_MZONE,nil)
+	if #g==0 then return end
+	local tc=g:GetFirst()
+	
+	-- Si Dreadroot sigue boca arriba en el campo, ejecuta la sentencia
+	if dread and dread:IsLocation(LOCATION_MZONE) and dread:IsFaceup() then
+		local atk=tc:GetAttack() -- Captura el ATK actual exacto (considera alteraciones en campo)
+		if Duel.Destroy(tc,REASON_EFFECT)>0 then
+			-- Incremento permanente de ATK para Dreadroot
+			local e1=Effect.CreateEffect(dread)
 			e1:SetType(EFFECT_TYPE_SINGLE)
 			e1:SetCode(EFFECT_UPDATE_ATTACK)
 			e1:SetValue(atk)
 			e1:SetReset(RESET_EVENT+RESETS_STANDARD)
-			c:RegisterEffect(e1)
+			dread:RegisterEffect(e1)
 		end
 	end
 end
