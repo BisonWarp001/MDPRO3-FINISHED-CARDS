@@ -150,8 +150,8 @@ function s.racost(e,tp,eg,ep,ev,re,r,rp,chk)
 
 	local atk,def=0,0
 	for rc in aux.Next(rg) do
-		atk=atk+math.max(rc:GetBaseAttack(),0)
-		def=def+math.max(rc:GetBaseDefense(),0)
+		atk=atk+math.max(rc:GetAttack(),0)
+		def=def+math.max(rc:GetDefense(),0)
 	end
 
 	e:SetLabel(atk,def)
