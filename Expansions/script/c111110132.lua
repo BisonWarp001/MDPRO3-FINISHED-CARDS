@@ -29,17 +29,7 @@ function s.initial_effect(c)
 	e2b:SetCode(EVENT_SUMMON_SUCCESS) -- Disparador para Invocación Normal
 	c:RegisterEffect(e2b)
 
-	-- (2) Restriction (Extra Deck LIGHT Warrior)
-	local e3=Effect.CreateEffect(c)
-	e3:SetType(EFFECT_TYPE_FIELD)
-	e3:SetRange(LOCATION_MZONE)
-	e3:SetCode(EFFECT_CANNOT_SPECIAL_SUMMON)
-	e3:SetProperty(EFFECT_FLAG_PLAYER_TARGET)
-	e3:SetTargetRange(1,0)
-	e3:SetTarget(s.splimit)
-	c:RegisterEffect(e3)
-
-	-- (3) GY Protection (Banish)
+	-- (2) GY Protection (Banish)
 	local e4=Effect.CreateEffect(c)
 	e4:SetDescription(aux.Stringid(id,1))
 	e4:SetType(EFFECT_TYPE_QUICK_O)
@@ -89,12 +79,7 @@ function s.thop(e,tp,eg,ep,ev,re,r,rp)
 	end
 end
 
--- (2) Lógica de Restricción
-function s.splimit(e,c)
-	return c:IsLocation(LOCATION_EXTRA) and not (c:IsAttribute(ATTRIBUTE_LIGHT) and c:IsRace(RACE_WARRIOR))
-end
-
--- (3) Lógica de Protección (Solo contra efectos del oponente)
+-- (2) Lógica de Protección (Solo contra efectos del oponente)
 function s.protop(e,tp,eg,ep,ev,re,r,rp)
 	local e1=Effect.CreateEffect(e:GetHandler())
 	e1:SetType(EFFECT_TYPE_FIELD)

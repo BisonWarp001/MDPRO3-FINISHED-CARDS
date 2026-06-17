@@ -66,12 +66,13 @@ function s.thop(e,tp,eg,ep,ev,re,r,rp)
 	end
 end
 
--- Funciones del Efecto (2)
+-- Funciones del Efecto (2) MODIFICADAS PARA EL LORE
 function s.tgfilter(c)
 	return c:IsLevel(10) and c:IsAbleToGrave()
 end
 function s.spfilter(c,e,tp)
-	return c:IsLevel(10) and c:IsCanBeSpecialSummoned(e,0,tp,true,false)
+	-- CORRECCIÓN: Aqua es una raza (RACE_AQUA), no un tipo
+	return c:IsLevel(10) and c:IsAttribute(ATTRIBUTE_WATER) and c:IsRace(RACE_AQUA) and c:IsCanBeSpecialSummoned(e,0,tp,true,false)
 end
 function s.sptg(e,tp,eg,ep,ev,re,r,rp,chk)
 	if chk==0 then 
@@ -90,21 +91,23 @@ function s.spop(e,tp,eg,ep,ev,re,r,rp)
 		Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_SPSUMMON)
 		local sg=Duel.SelectMatchingCard(tp,s.spfilter,tp,LOCATION_EXTRA,0,1,1,nil,e,tp)
 		if #sg>0 and Duel.SpecialSummon(sg,0,tp,tp,true,false,POS_FACEUP)~=0 then
-			-- Candado: No puedes activar efectos de monstruos Invocados Especialmente desde el Extra Deck
+			-- Candado: Bloquea activación de efectos de monstruos invocados del Extra Deck
 			local e1=Effect.CreateEffect(e:GetHandler())
 			e1:SetType(EFFECT_TYPE_FIELD)
 			e1:SetCode(EFFECT_CANNOT_ACTIVATE)
 			e1:SetProperty(EFFECT_FLAG_PLAYER_TARGET)
 			e1:SetTargetRange(1,0)
 			e1:SetValue(s.aclimit)
-			e1:SetReset(RESET_PHASE+PHASE_END+RESET_SELF_TURN,2)
+			-- Modificado: Hasta el fin del PRÓXIMO turno global (Turno actual + el siguiente completo)
+			e1:SetReset(RESET_PHASE+PHASE_END,2)
 			Duel.RegisterEffect(e1,tp)
 		end
 	end
 end
 
--- Filtro del candado corregido según tu nuevo wording literal
+-- Filtro del candado adaptado al texto en inglés literal
 function s.aclimit(e,re,tp)
 	local rc=re:GetHandler()
-	return re:IsActiveType(TYPE_MONSTER) and rc:IsLocation(LOCATION_MZONE) and rc:IsSummonLocation(LOCATION_EXTRA)
+	-- Bloquea efectos si el monstruo fue originalmente invocado del Extra Deck (esté o no en el campo al activarse)
+	return re:IsActiveType(TYPE_MONSTER) and rc:IsSummonLocation(LOCATION_EXTRA)
 end

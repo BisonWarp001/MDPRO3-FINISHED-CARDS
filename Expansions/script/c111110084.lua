@@ -1,162 +1,115 @@
--- Apostle of Jashin
+-- Disciple of the Wicked One
+-- ID de la carta: Reemplaza XXXXYYYY con el ID numérico real de tu carta
 local s,id=GetID()
-
 function s.initial_effect(c)
-	-- Registrar que esta carta nombra textualmente a los 3 Dioses Malignos
+	-- Lista de códigos asociados (The Wicked Avatar, Dreadroot, Eraser)
 	aux.AddCodeList(c,21208154,62180201,57793869)
-
-	-------------------------------------------------
-	-- ① If added to hand (except draw): SS (HOPT id)
-	-------------------------------------------------
+	
+	-- (1) Añadir 1 Magia/Trampa desde el Deck a la mano si hay un monstruo calificado en el GY
 	local e1=Effect.CreateEffect(c)
 	e1:SetDescription(aux.Stringid(id,0))
-	e1:SetCategory(CATEGORY_SPECIAL_SUMMON)
-	e1:SetType(EFFECT_TYPE_SINGLE+EFFECT_TYPE_TRIGGER_O)
-	e1:SetCode(EVENT_TO_HAND)
-	e1:SetProperty(EFFECT_FLAG_DELAY)
+	e1:SetCategory(CATEGORY_TOHAND+CATEGORY_SEARCH)
+	e1:SetType(EFFECT_TYPE_IGNITION)
+	e1:SetRange(LOCATION_MZONE)
 	e1:SetCountLimit(1,id)
-	e1:SetCondition(s.spcon)
-	e1:SetTarget(s.sptg)
-	e1:SetOperation(s.spop)
+	e1:SetCondition(s.thcon)
+	e1:SetTarget(s.thtg)
+	e1:SetOperation(s.thop)
 	c:RegisterEffect(e1)
-
-	-------------------------------------------------
-	-- ② If Tributed for a Wicked God: Select 1 (HOPT)
-	-------------------------------------------------
+	
+	-- (2) Negate+Special Summon
 	local e2=Effect.CreateEffect(c)
 	e2:SetDescription(aux.Stringid(id,1))
-	e2:SetType(EFFECT_TYPE_SINGLE+EFFECT_TYPE_TRIGGER_O)
-	e2:SetProperty(EFFECT_FLAG_DELAY)
-	e2:SetCode(EVENT_TO_GRAVE)
-	e2:SetCondition(s.wickedcon)
-	e2:SetTarget(s.wickedtg)
-	e2:SetOperation(s.wickedop)
+	e2:SetCategory(CATEGORY_NEGATE+CATEGORY_SPECIAL_SUMMON)
+	e2:SetType(EFFECT_TYPE_QUICK_O)
+	e2:SetCode(EVENT_CHAINING)
+	e2:SetRange(LOCATION_MZONE)
+	e2:SetCountLimit(1,id+100)
+	e2:SetCondition(s.discon)
+	e2:SetTarget(s.distg)
+	e2:SetOperation(s.disop)
 	c:RegisterEffect(e2)
-	local e2b=e2:Clone()
-	e2b:SetCode(EVENT_REMOVE)
-	c:RegisterEffect(e2b)
 end
 
--- IDs de los Dioses Malignos
-local CARD_AVATAR   = 21208154
-local CARD_DREADROOT = 62180201
-local CARD_ERASER    = 57793869
-
--------------------------------------------------
--- ① Condition & Functions (Gargoyle Style)
--------------------------------------------------
-function s.spcon(e,tp,eg,ep,ev,re,r,rp)
-	return not e:GetHandler():IsReason(REASON_DRAW)
+-- Filtro 1: Monstruo que mencione a los Dioses (Usando aux.IsCodeListed)
+function s.cfilter(c)
+	return c:IsType(TYPE_MONSTER)
+		and (aux.IsCodeListed(c,21208154) or aux.IsCodeListed(c,62180201) or aux.IsCodeListed(c,57793869))
 end
 
-function s.sptg(e,tp,eg,ep,ev,re,r,rp,chk)
-	local c=e:GetHandler()
+-- Condición (1): Comprobación en el Cementerio usando LOCATION_GRAVE
+function s.thcon(e,tp,eg,ep,ev,re,r,rp)
+	return Duel.IsExistingMatchingCard(s.cfilter,tp,LOCATION_GRAVE,0,1,nil)
+end
+
+-- Filtro para buscar Magias o Trampas que mencionen a los Dioses
+function s.thfilter(c)
+	return c:IsType(TYPE_SPELL+TYPE_TRAP)
+		and (aux.IsCodeListed(c,21208154) or aux.IsCodeListed(c,62180201) or aux.IsCodeListed(c,57793869))
+		and c:IsAbleToHand()
+end
+
+function s.thtg(e,tp,eg,ep,ev,re,r,rp,chk)
+	if chk==0 then return Duel.IsExistingMatchingCard(s.thfilter,tp,LOCATION_DECK,0,1,nil) end
+	Duel.SetOperationInfo(0,CATEGORY_TOHAND,nil,1,tp,LOCATION_DECK)
+end
+
+function s.thop(e,tp,eg,ep,ev,re,r,rp)
+	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_ATOHAND)
+	local g=Duel.SelectMatchingCard(tp,s.thfilter,tp,LOCATION_DECK,0,1,1,nil)
+	if #g>0 then
+		Duel.SendtoHand(g,nil,REASON_EFFECT)
+		Duel.ConfirmCards(1-tp,g)
+	end
+end
+
+-- Filtro para revivir del GY monstruos válidos
+-- Condición (2): Un monstruo que controla el adversario activa su efecto
+-- (2) When a monster your opponent controls activates its effect
+function s.discon(e,tp,eg,ep,ev,re,r,rp)
+	local loc=Duel.GetChainInfo(ev,CHAININFO_TRIGGERING_LOCATION)
+	local tc=re:GetHandler()
+	return tc:IsControler(1-tp)
+		and loc==LOCATION_MZONE
+		and re:IsActiveType(TYPE_MONSTER)
+		and Duel.IsChainDisablable(ev)
+end
+
+-- Monstruos que mencionan a los Wicked Gods
+function s.spfilter(c,e,tp)
+	return c:IsType(TYPE_MONSTER)
+		and (aux.IsCodeListed(c,21208154)
+			or aux.IsCodeListed(c,62180201)
+			or aux.IsCodeListed(c,57793869))
+		and c:IsCanBeSpecialSummoned(e,0,tp,false,false)
+		and not c:IsCode(id)
+end
+
+function s.distg(e,tp,eg,ep,ev,re,r,rp,chk)
 	if chk==0 then
 		return Duel.GetLocationCount(tp,LOCATION_MZONE)>0
-			and c:IsCanBeSpecialSummoned(e,0,tp,false,false)
+			and Duel.IsExistingMatchingCard(
+				aux.NecroValleyFilter(s.spfilter),
+				tp,LOCATION_GRAVE,0,1,nil,e,tp)
 	end
-	Duel.SetOperationInfo(0,CATEGORY_SPECIAL_SUMMON,c,1,tp,0)
+	Duel.SetOperationInfo(0,CATEGORY_DISABLE,eg,1,0,0)
+	Duel.SetOperationInfo(0,CATEGORY_SPECIAL_SUMMON,nil,1,tp,LOCATION_GRAVE)
 end
 
-function s.spop(e,tp,eg,ep,ev,re,r,rp)
-	local c=e:GetHandler()
-	if c:IsRelateToEffect(e) then
-		Duel.SpecialSummon(c,0,tp,tp,false,false,POS_FACEUP)
-	end
-end
+function s.disop(e,tp,eg,ep,ev,re,r,rp)
+	if not Duel.NegateEffect(ev) then return end
 
--------------------------------------------------
--- ② Condition & Functions
--------------------------------------------------
-function s.wickedcon(e,tp,eg,ep,ev,re,r,rp)
-	local c=e:GetHandler()
-	local rc=c:GetReasonCard()
-	return c:IsReason(REASON_SUMMON) and rc 
-		and (rc:IsCode(CARD_AVATAR) or rc:IsCode(CARD_DREADROOT) or rc:IsCode(CARD_ERASER))
-end
+	if Duel.GetLocationCount(tp,LOCATION_MZONE)<=0 then return end
 
--- Filtro para buscar una trampa "Jashin" (arquetipo 0x3f2)
-function s.trapfilter(c)
-	return c:IsSetCard(0x3f2) and c:IsType(TYPE_TRAP) and c:IsSSetable()
-end
+	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_SPSUMMON)
+	local g=Duel.SelectMatchingCard(
+		tp,
+		aux.NecroValleyFilter(s.spfilter),
+		tp,LOCATION_GRAVE,0,
+		1,1,nil,e,tp
+	)
 
-function s.wickedtg(e,tp,eg,ep,ev,re,r,rp,chk)
-	local c=e:GetHandler()
-	local rc=c:GetReasonCard()
-	
-	-- Contar cuántos monstruos totales se usaron como tributo para esa invocación
-	local ct=rc:GetMaterialCount()
-	if chk==0 then
-		if ct==0 then return false end
-		-- Opción 1: Negar cartas boca arriba (HOPT usando id+100)
-		local b1=Duel.IsExistingMatchingCard(aux.NegateAnyFilter,tp,0,LOCATION_ONFIELD,1,nil) and Duel.GetFlagEffect(tp,id+100)==0
-		-- Opción 2: Colocar Trampa "Jashin" (HOPT usando id+200)
-		local b2=Duel.IsExistingMatchingCard(s.trapfilter,tp,LOCATION_DECK,0,1,nil) and Duel.GetFlagEffect(tp,id+200)==0
-		return b1 or b2
-	end
-
-	local b1=Duel.IsExistingMatchingCard(aux.NegateAnyFilter,tp,0,LOCATION_ONFIELD,1,nil) and Duel.GetFlagEffect(tp,id+100)==0
-	local b2=Duel.IsExistingMatchingCard(s.trapfilter,tp,LOCATION_DECK,0,1,nil) and Duel.GetFlagEffect(tp,id+200)==0
-
-	-- Menú de opciones utilizando la estructura clásica de EDOCore
-	local op=aux.SelectFromOptions(tp,
-		{b1,aux.Stringid(id,2),1}, -- "Negate face-up cards"
-		{b2,aux.Stringid(id,3),2}) -- "Set 1 Jashin Trap"
-
-	e:SetLabel(op,ct)
-	if op==1 then
-		e:SetCategory(CATEGORY_DISABLE)
-		Duel.RegisterFlagEffect(tp,id+100,RESET_PHASE+PHASE_END,0,1)
-		local g=Duel.GetMatchingGroup(aux.NegateAnyFilter,tp,0,LOCATION_ONFIELD,nil)
-		Duel.SetOperationInfo(0,CATEGORY_DISABLE,g,1,0,0)
-	elseif op==2 then
-		e:SetCategory(0)
-		Duel.RegisterFlagEffect(tp,id+200,RESET_PHASE+PHASE_END,0,1)
-	end
-end
-
-function s.wickedop(e,tp,eg,ep,ev,re,r,rp)
-	local op,ct=e:GetLabel()
-	
-	-- ● Opción 1: Negar efectos del oponente igual a la cantidad de materiales
-	if op==1 then
-		if not Duel.IsExistingMatchingCard(aux.NegateAnyFilter,tp,0,LOCATION_ONFIELD,1,nil) then return end
-		Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_DISABLE)
-		local g=Duel.SelectMatchingCard(tp,aux.NegateAnyFilter,tp,0,LOCATION_ONFIELD,1,ct,nil)
-		if #g>0 then
-			Duel.HintSelection(g)
-			for tc in aux.Next(g) do
-				Duel.NegateRelatedChain(tc,RESET_TURN_SET)
-				local e1=Effect.CreateEffect(e:GetHandler())
-				e1:SetType(EFFECT_TYPE_SINGLE)
-				e1:SetProperty(EFFECT_FLAG_CANNOT_DISABLE)
-				e1:SetCode(EFFECT_DISABLE)
-				e1:SetReset(RESET_EVENT+RESETS_STANDARD)
-				tc:RegisterEffect(e1)
-				local e2=Effect.CreateEffect(e:GetHandler())
-				e2:SetType(EFFECT_TYPE_SINGLE)
-				e2:SetProperty(EFFECT_FLAG_CANNOT_DISABLE)
-				e2:SetCode(EFFECT_DISABLE_EFFECT)
-				e2:SetValue(RESET_TURN_SET)
-				e2:SetReset(RESET_EVENT+RESETS_STANDARD)
-				tc:RegisterEffect(e2)
-				if tc:IsType(TYPE_TRAPMONSTER) then
-					local e3=Effect.CreateEffect(e:GetHandler())
-					e3:SetType(EFFECT_TYPE_SINGLE)
-					e3:SetProperty(EFFECT_FLAG_CANNOT_DISABLE)
-					e3:SetCode(EFFECT_DISABLE_TRAPMONSTER)
-					e3:SetReset(RESET_EVENT+RESETS_STANDARD)
-					tc:RegisterEffect(e3)
-				end
-			end
-		end
-
-	-- ● Opción 2: Colocar 1 Trampa "Jashin" directamente desde el Deck
-	elseif op==2 then
-		Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_SET)
-		local g=Duel.SelectMatchingCard(tp,s.trapfilter,tp,LOCATION_DECK,0,1,1,nil)
-		if #g>0 then
-			Duel.SSet(tp,g:GetFirst())
-		end
+	if #g>0 then
+		Duel.SpecialSummon(g,0,tp,tp,false,false,POS_FACEUP)
 	end
 end

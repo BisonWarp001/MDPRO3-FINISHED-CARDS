@@ -1,102 +1,75 @@
 -- Altar of Jashin
-local s,id,o=GetID()
+-- ID de la carta: Reemplaza XXXXYYYY con el ID numérico real de tu carta
+local s,id=GetID()
 function s.initial_effect(c)
-	aux.AddCodeList(c,21208154,57793869,62180201)
-	-- Activar la carta como Magia Continua
+	aux.AddCodeList(c,21208154,62180201,57793869)
+	
+	-- Activar la carta como Magia Continua (You can only activate 1 "Altar of Jashin" per turn)
 	local e0=Effect.CreateEffect(c)
 	e0:SetType(EFFECT_TYPE_ACTIVATE)
 	e0:SetCode(EVENT_FREE_CHAIN)
-	e0:SetProperty(EFFECT_FLAG_CANNOT_DISABLE)
-	e0:SetCountLimit(1,id+EFFECT_COUNT_CODE_OATH) -- Solo puedes activar 1 "Altar of Jashin" por turno
+	e0:SetCountLimit(1,id+EFFECT_COUNT_CODE_OATH)
 	c:RegisterEffect(e0)
 
-	-- (1) Protección ante Invocación por Tributo (Lógica basada en Meteor)
+	-- (1) Tu oponente no puede activar cartas o efectos cuando invocas por tributo
 	local e1=Effect.CreateEffect(c)
 	e1:SetType(EFFECT_TYPE_FIELD+EFFECT_TYPE_CONTINUOUS)
-	e1:SetRange(LOCATION_SZONE)
 	e1:SetCode(EVENT_SUMMON_SUCCESS)
+	e1:SetRange(LOCATION_SZONE)
 	e1:SetOperation(s.sucop)
 	c:RegisterEffect(e1)
+
+	-- (2) Una vez por turno: Añadir 1 monstruo que mencione a los Dioses
 	local e2=Effect.CreateEffect(c)
-	e2:SetType(EFFECT_TYPE_FIELD+EFFECT_TYPE_CONTINUOUS)
+	e2:SetDescription(aux.Stringid(id,0))
+	e2:SetCategory(CATEGORY_TOHAND+CATEGORY_SEARCH)
+	e2:SetType(EFFECT_TYPE_IGNITION)
 	e2:SetRange(LOCATION_SZONE)
-	e2:SetCode(EVENT_CHAIN_END)
-	e2:SetOperation(s.cedop)
+	e2:SetCountLimit(1) -- Soft Once Per Turn (Una vez por copia boca arriba)
+	e2:SetTarget(s.thtg)
+	e2:SetOperation(s.thop)
 	c:RegisterEffect(e2)
 
-	-- (2) Una vez por turno: Añadir 1 monstruo "Jashin" del Deck a la mano
+	-- (3) Robar 2 cartas si se Invoca de Modo Normal a Avatar, Dreadroot o Eraser (Hard Once Per Turn)
 	local e3=Effect.CreateEffect(c)
-	e3:SetDescription(aux.Stringid(id,0))
-	e3:SetCategory(CATEGORY_TOHAND+CATEGORY_SEARCH)
-	e3:SetType(EFFECT_TYPE_IGNITION)
+	e3:SetDescription(aux.Stringid(id,1))
+	e3:SetCategory(CATEGORY_DRAW)
+	e3:SetType(EFFECT_TYPE_FIELD+EFFECT_TYPE_TRIGGER_O)
+	e3:SetProperty(EFFECT_FLAG_PLAYER_TARGET+EFFECT_FLAG_DELAY)
+	e3:SetCode(EVENT_SUMMON_SUCCESS)
 	e3:SetRange(LOCATION_SZONE)
-	e3:SetCountLimit(1) -- Una vez por turno
-	e3:SetTarget(s.thtg)
-	e3:SetOperation(s.thop)
+	e3:SetCountLimit(1,id) -- Hard Once Per Turn por nombre ("You can only use this effect of...")
+	e3:SetTarget(s.drtg)
+	e3:SetOperation(s.drop)
 	c:RegisterEffect(e3)
-
-	-- (3) Robar 2 cartas si se Invoca de Modo Normal a Avatar, Dreadroot o Eraser
-	local e4=Effect.CreateEffect(c)
-	e4:SetDescription(aux.Stringid(id,1))
-	e4:SetCategory(CATEGORY_DRAW)
-	e4:SetType(EFFECT_TYPE_FIELD+EFFECT_TYPE_TRIGGER_O)
-	e4:SetProperty(EFFECT_FLAG_PLAYER_TARGET+EFFECT_FLAG_DELAY)
-	e4:SetCode(EVENT_SUMMON_SUCCESS)
-	e4:SetRange(LOCATION_SZONE)
-	e4:SetCountLimit(1,id) -- Solo puedes usar este efecto de "Altar of Jashin" una vez por turno
-	e4:SetTarget(s.drtg)
-	e4:SetOperation(s.drop)
-	c:RegisterEffect(e4)
 end
 
 -- ====================================================================================
--- LÓGICA DEL EFECTO (1): PROTECCIÓN ANTE INVOCACIÓN POR TRIBUTO
+-- LÓGICA DEL EFECTO (1): BLOQUEO DE ACTIVACIÓN (ESTILO MAGMAGESTAD / FLOOWANDEREEZE)
 -- ====================================================================================
-
-function s.chainlm(e,rp,tp)
-	return tp==rp -- El oponente no puede activar cartas (solo tú puedes encadenar)
-end
-
 function s.sucfilter(c,tp)
 	return c:IsSummonType(SUMMON_TYPE_ADVANCE) and c:IsControler(tp)
 end
 
+function s.chainlm(e,rp,tp)
+	return tp==rp -- El oponente no puede encadenar nada
+end
+
 function s.sucop(e,tp,eg,ep,ev,re,r,rp)
-	if not eg:IsExists(s.sucfilter,1,nil,tp) then return end
-	if Duel.GetCurrentChain()==0 then
-		Duel.SetChainLimitTillChainEnd(s.chainlm)
-	elseif Duel.GetCurrentChain()==1 then
-		Duel.RegisterFlagEffect(tp,id+o,RESET_EVENT+RESETS_STANDARD,0,1)
-		local e1=Effect.CreateEffect(e:GetHandler())
-		e1:SetType(EFFECT_TYPE_FIELD+EFFECT_TYPE_CONTINUOUS)
-		e1:SetCode(EVENT_CHAINING)
-		e1:SetOperation(s.resetop)
-		Duel.RegisterEffect(e1,tp)
-		local e2=e1:Clone()
-		e2:SetCode(EVENT_BREAK_EFFECT)
-		e2:SetReset(RESET_CHAIN)
-		Duel.RegisterEffect(e2,tp)
-	end
-end
-
-function s.resetop(e,tp,eg,ep,ev,re,r,rp)
-	Duel.ResetFlagEffect(tp,id+o*2)
-	e:Reset()
-end
-
-function s.cedop(e,tp,eg,ep,ev,re,r,rp)
-	if Duel.GetFlagEffect(tp,id+o*2)~=0 then
+	-- Si tú invocaste por Tributo (Advance), bloquea la ventana de respuesta del oponente
+	if eg:IsExists(s.sucfilter,1,nil,tp) then
 		Duel.SetChainLimitTillChainEnd(s.chainlm)
 	end
-	Duel.ResetFlagEffect(tp,id+o*2)
 end
 
 -- ====================================================================================
--- LÓGICA DEL EFECTO (2): BÚSQUEDA DEL ARQUETIPO "JASHIN" (0x3f2)
+-- LÓGICA DEL EFECTO (2): BÚSQUEDA USANDO LA SINTAXIS NATIVA DE TU MOTOR
 -- ====================================================================================
-
 function s.thfilter(c)
-	return c:IsSetCard(0x3f2) and c:IsType(TYPE_MONSTER) and c:IsAbleToHand()
+	-- Filtro estricto con IsType(TYPE_MONSTER) y aux.IsCodeListed
+	return c:IsType(TYPE_MONSTER) 
+		and (aux.IsCodeListed(c,21208154) or aux.IsCodeListed(c,62180201) or aux.IsCodeListed(c,57793869))
+		and c:IsAbleToHand()
 end
 
 function s.thtg(e,tp,eg,ep,ev,re,r,rp,chk)
@@ -105,6 +78,7 @@ function s.thtg(e,tp,eg,ep,ev,re,r,rp,chk)
 end
 
 function s.thop(e,tp,eg,ep,ev,re,r,rp)
+	-- Valida que la Magia Continua siga boca arriba en el campo al resolver
 	if not e:GetHandler():IsRelateToEffect(e) then return end
 	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_ATOHAND)
 	local g=Duel.SelectMatchingCard(tp,s.thfilter,tp,LOCATION_DECK,0,1,1,nil)
@@ -115,11 +89,11 @@ function s.thop(e,tp,eg,ep,ev,re,r,rp)
 end
 
 -- ====================================================================================
--- LÓGICA DEL EFECTO (3): ROBO DE CARTAS (THE WICKED GODS)
+-- LÓGICA DEL EFECTO (3): ROBO POR DIOSES MALIGNOS
 -- ====================================================================================
-
 function s.drfilter(c)
-	return c:IsFaceup() and (c:IsCode(21208154) or c:IsCode(57793869) or c:IsCode(62180201))
+	-- No requiere IsFaceup() porque EVENT_SUMMON_SUCCESS valida al entrar al campo de inmediato
+	return c:IsCode(21208154,62180201,57793869)
 end
 
 function s.drtg(e,tp,eg,ep,ev,re,r,rp,chk)

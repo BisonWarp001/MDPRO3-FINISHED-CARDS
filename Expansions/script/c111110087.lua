@@ -1,189 +1,179 @@
--- Wicked Apostle - Sky Devourer
+-- Lillith the Succubus
 local s,id=GetID()
-
 function s.initial_effect(c)
-	c:EnableReviveLimit()
-
-	-- Xyz Summon
-	aux.AddXyzProcedure(c,nil,10,2,s.ovfilter,aux.Stringid(id,0))
-
-	-- Triple Tribute Flag
-	local e0=Effect.CreateEffect(c)
-	e0:SetType(EFFECT_TYPE_SINGLE)
-	e0:SetCode(id)
-	c:RegisterEffect(e0)
-
-	-- Triple Tribute Summon
+	
+	-------------------------------------------------
+	-- (1) IGNITION: Invocación Especial + Equipar (Desde la Mano)
+	-------------------------------------------------
 	local e1=Effect.CreateEffect(c)
-	e1:SetDescription(aux.Stringid(id,1))
-	e1:SetType(EFFECT_TYPE_FIELD)
-	e1:SetCode(EFFECT_LIMIT_SUMMON_PROC)
-	e1:SetRange(LOCATION_MZONE)
-	e1:SetTargetRange(LOCATION_HAND,0)
-	e1:SetCondition(s.ttcon)
-	e1:SetTarget(s.RequireSummon)
-	e1:SetOperation(s.ttop)
-	e1:SetValue(SUMMON_TYPE_ADVANCE)
+	e1:SetDescription(aux.Stringid(id,0))
+	e1:SetCategory(CATEGORY_SPECIAL_SUMMON+CATEGORY_EQUIP)
+	e1:SetType(EFFECT_TYPE_IGNITION)
+	e1:SetProperty(EFFECT_FLAG_CARD_TARGET)
+	e1:SetRange(LOCATION_HAND)
+	e1:SetCountLimit(1,id)
+	e1:SetTarget(s.sptg1)
+	e1:SetOperation(s.spop1)
 	c:RegisterEffect(e1)
 
-	local e2=e1:Clone()
-	e2:SetCode(EFFECT_LIMIT_SET_PROC)
-	e2:SetTarget(s.RequireSet)
+	-------------------------------------------------
+	-- (2) IGNITION: Equipar de GY oponente O de tu DECK (Si no tiene equipos)
+	-------------------------------------------------
+	local e2=Effect.CreateEffect(c)
+	e2:SetDescription(aux.Stringid(id,1))
+	e2:SetCategory(CATEGORY_EQUIP)
+	e2:SetType(EFFECT_TYPE_IGNITION) -- Cambiado a Ignition (Velocidad 1)
+	e2:SetRange(LOCATION_MZONE)
+	e2:SetCountLimit(1,id+100)
+	e2:SetCondition(s.eqcon2)
+	e2:SetTarget(s.eqtg2)
+	e2:SetOperation(s.eqop2)
 	c:RegisterEffect(e2)
 
-	local e3=e1:Clone()
-	e3:SetCode(EFFECT_SUMMON_PROC)
-	e3:SetTarget(s.CanSummon)
-	e3:SetValue(SUMMON_TYPE_ADVANCE+SUMMON_VALUE_SELF)
+	-------------------------------------------------
+	-- (3) QUICK EFFECT: Invocar la carta que tiene equipada
+	-------------------------------------------------
+	local e3=Effect.CreateEffect(c)
+	e3:SetDescription(aux.Stringid(id,2))
+	e3:SetCategory(CATEGORY_SPECIAL_SUMMON)
+	e3:SetType(EFFECT_TYPE_QUICK_O) -- Cambiado a Quick Effect (Velocidad 2)
+	e3:SetCode(EVENT_FREE_CHAIN)   -- Permite activarlo en cualquier ventana de cadena libre
+	e3:SetProperty(EFFECT_FLAG_CARD_TARGET)
+	e3:SetRange(LOCATION_MZONE)
+	e3:SetCountLimit(1,id+200)
+	e3:SetCondition(s.spcon3)
+	e3:SetTarget(s.sptg3)
+	e3:SetOperation(s.spop3)
 	c:RegisterEffect(e3)
-
-	-- Banish Extra Deck
-	local e4=Effect.CreateEffect(c)
-	e4:SetDescription(aux.Stringid(id,2))
-	e4:SetCategory(CATEGORY_REMOVE)
-	e4:SetType(EFFECT_TYPE_IGNITION)
-	e4:SetRange(LOCATION_MZONE)
-	e4:SetCountLimit(1,id)
-	e4:SetCost(s.rmcost)
-	e4:SetTarget(s.extg)
-	e4:SetOperation(s.exop)
-	c:RegisterEffect(e4)
-
-	-- Double Attack Inheritance
-	local e5=Effect.CreateEffect(c)
-	e5:SetType(EFFECT_TYPE_SINGLE+EFFECT_TYPE_CONTINUOUS)
-	e5:SetCode(EVENT_BE_PRE_MATERIAL)
-	e5:SetCondition(s.regcon)
-	e5:SetOperation(s.regop)
-	c:RegisterEffect(e5)
 end
 
--- =========================================================
--- Alternative Xyz Material
--- =========================================================
-
-function s.ovfilter(c)
-	return c:IsFaceup()
-		and c:GetBaseDefense()==3000
+-- Lógica (1)
+function s.eqfilter1(c)
+	return c:IsMonster()
 end
-
--- =========================================================
--- Triple Tribute Logic
--- =========================================================
-
-function s.ttfilter(c,tp)
-	return c:IsHasEffect(id)
-		and c:IsReleasable(REASON_SUMMON)
-		and Duel.GetMZoneCount(tp,c)>0
+function s.sptg1(e,tp,eg,ep,ev,re,r,rp,chk,chkc)
+	if chkc then return chkc:IsLocation(LOCATION_GRAVE) and chkc:IsControler(1-tp) and s.eqfilter1(chkc) end
+	local c=e:GetHandler()
+	if chk==0 then return Duel.GetLocationCount(tp,LOCATION_MZONE)>0
+		and c:IsCanBeSpecialSummoned(e,0,tp,false,false)
+		and Duel.GetLocationCount(tp,LOCATION_SZONE)>0
+		and Duel.IsExistingTarget(s.eqfilter1,tp,0,LOCATION_GRAVE,1,nil) end
+	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_EQUIP)
+	local g=Duel.SelectTarget(tp,s.eqfilter1,tp,0,LOCATION_GRAVE,1,1,nil)
+	Duel.SetOperationInfo(0,CATEGORY_SPECIAL_SUMMON,c,1,0,0)
+	Duel.SetOperationInfo(0,CATEGORY_EQUIP,g,1,0,0)
 end
-
-function s.ttcon(e,c,minc)
-	if c==nil then return true end
-
-	local tp=c:GetControler()
-
-	return minc<=3
-		and (
-			s.RequireSummon(e,c)
-			or s.RequireSet(e,c)
-			or s.CanSummon(e,c)
-		)
-		and Duel.IsExistingMatchingCard(
-			s.ttfilter,tp,LOCATION_MZONE,0,1,nil,tp
-		)
-end
-
-function s.ttop(e,tp,eg,ep,ev,re,r,rp,c)
-	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_RELEASE)
-
-	local g=Duel.SelectMatchingCard(
-		tp,s.ttfilter,tp,LOCATION_MZONE,0,1,1,nil,tp
-	)
-
-	c:SetMaterial(g)
-	Duel.Release(g,REASON_SUMMON+REASON_MATERIAL)
-end
-
-function s.RequireSummon(e,c)
-	return c:IsCode(
-		10000000,10000010,10000020,10000080,
-		21208154,57793869,62180201,57761191
-	)
-end
-
-function s.RequireSet(e,c)
-	return c:IsCode(
-		21208154,57793869,62180201,
-		111110200,111110201
-	)
-end
-
-function s.CanSummon(e,c)
-	return c:IsCode(
-		3912064,25524823,36354007,
-		75285069,78651105
-	)
-end
-
--- =========================================================
--- Banish Extra Deck
--- =========================================================
-
-function s.rmcost(e,tp,eg,ep,ev,re,r,rp,chk)
-	if chk==0 then
-		return e:GetHandler():CheckRemoveOverlayCard(
-			tp,1,REASON_COST
-		)
+function s.spop1(e,tp,eg,ep,ev,re,r,rp)
+	local c=e:GetHandler()
+	local tc=Duel.GetFirstTarget()
+	if not c:IsRelateToEffect(e) then return end
+	if Duel.SpecialSummon(c,0,tp,tp,false,false,POS_FACEUP)>0 then
+		if tc:IsRelateToEffect(e) and Duel.GetLocationCount(tp,LOCATION_SZONE)>0 then
+			Duel.Equip(tp,tc,c,false)
+			local e1=Effect.CreateEffect(c)
+			e1:SetType(EFFECT_TYPE_SINGLE)
+			e1:SetProperty(EFFECT_FLAG_OWNER_RELATE)
+			e1:SetCode(EFFECT_EQUIP_LIMIT)
+			e1:SetReset(RESET_EVENT+RESETS_STANDARD)
+			e1:SetValue(s.eqlimit)
+			tc:RegisterEffect(e1)
+		end
 	end
-
-	e:GetHandler():RemoveOverlayCard(
-		tp,1,1,REASON_COST
-	)
+end
+function s.eqlimit(e,c)
+	return e:GetOwner()==c
 end
 
-function s.extg(e,tp,eg,ep,ev,re,r,rp,chk)
-	if chk==0 then
-		return Duel.IsExistingMatchingCard(
-			aux.TRUE,tp,0,LOCATION_EXTRA,1,nil
-		)
+-- Lógica (2): Ignition - Equipar de GY o Deck
+function s.eqcon2(e,tp,eg,ep,ev,re,r,rp)
+	return #e:GetHandler():GetEquipGroup()==0
+end
+function s.deckfilter(c)
+	return c:IsMonster()
+end
+function s.eqtg2(e,tp,eg,ep,ev,re,r,rp,chk,chkc)
+	if chkc then return chkc:IsLocation(LOCATION_GRAVE) and chkc:IsControler(1-tp) and s.eqfilter1(chkc) end
+	
+	local b1=Duel.IsExistingTarget(s.eqfilter1,tp,0,LOCATION_GRAVE,1,nil)
+	local b2=Duel.IsExistingMatchingCard(s.deckfilter,tp,LOCATION_DECK,0,1,nil)
+	
+	if chk==0 then return Duel.GetLocationCount(tp,LOCATION_SZONE)>0 and (b1 or b2) end
+	
+	local op=0
+	if b1 and b2 then
+		op=Duel.SelectOption(tp,aux.Stringid(id,3),aux.Stringid(id,4))
+	elseif b1 then
+		op=Duel.SelectOption(tp,aux.Stringid(id,3))
+	else
+		op=Duel.SelectOption(tp,aux.Stringid(id,4))+1
+	end
+	e:SetLabel(op)
+	
+	if op==0 then
+		e:SetProperty(EFFECT_FLAG_CARD_TARGET)
+		Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_EQUIP)
+		local g=Duel.SelectTarget(tp,s.eqfilter1,tp,0,LOCATION_GRAVE,1,1,nil)
+		Duel.SetOperationInfo(0,CATEGORY_EQUIP,g,1,0,0)
+	else
+		e:SetProperty(0)
+		Duel.SetOperationInfo(0,CATEGORY_EQUIP,nil,1,tp,LOCATION_DECK)
+	end
+end
+function s.eqop2(e,tp,eg,ep,ev,re,r,rp)
+	local c=e:GetHandler()
+	if not c:IsRelateToEffect(e) or c:IsFacedown() or Duel.GetLocationCount(tp,LOCATION_SZONE)<=0 then return end
+	
+	local op=e:GetLabel()
+	if op==0 then
+		local tc=Duel.GetFirstTarget()
+		if tc and tc:IsRelateToEffect(e) then
+			Duel.Equip(tp,tc,c,false)
+			local e1=Effect.CreateEffect(c)
+			e1:SetType(EFFECT_TYPE_SINGLE)
+			e1:SetProperty(EFFECT_FLAG_OWNER_RELATE)
+			e1:SetCode(EFFECT_EQUIP_LIMIT)
+			e1:SetReset(RESET_EVENT+RESETS_STANDARD)
+			e1:SetValue(s.eqlimit)
+			tc:RegisterEffect(e1)
+		end
+	else
+		Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_EQUIP)
+		local g=Duel.SelectMatchingCard(tp,s.deckfilter,tp,LOCATION_DECK,0,1,1,nil)
+		local tc=g:GetFirst()
+		if tc then
+			Duel.Equip(tp,tc,c,false)
+			local e1=Effect.CreateEffect(c)
+			e1:SetType(EFFECT_TYPE_SINGLE)
+			e1:SetProperty(EFFECT_FLAG_OWNER_RELATE)
+			e1:SetCode(EFFECT_EQUIP_LIMIT)
+			e1:SetReset(RESET_EVENT+RESETS_STANDARD)
+			e1:SetValue(s.eqlimit)
+			tc:RegisterEffect(e1)
+		end
 	end
 end
 
-function s.exop(e,tp,eg,ep,ev,re,r,rp)
-	local g=Duel.GetFieldGroup(tp,0,LOCATION_EXTRA)
-
-	if #g>0 then
-		local sg=g:RandomSelect(tp,1)
-		Duel.Remove(sg,POS_FACEDOWN,REASON_EFFECT)
+-- Lógica (3): Quick Effect - Invocar equipo
+function s.spcon3(e,tp,eg,ep,ev,re,r,rp)
+	local g=e:GetHandler():GetEquipGroup()
+	return #g>0
+end
+function s.spfilter3(c,e,tp)
+	return c:IsCanBeSpecialSummoned(e,0,tp,false,false)
+end
+function s.sptg3(e,tp,eg,ep,ev,re,r,rp,chk,chkc)
+	local c=e:GetHandler()
+	if chkc then return chkc:IsLocation(LOCATION_SZONE) and chkc:IsControler(tp) and c:GetEquipGroup():IsContains(chkc) and s.spfilter3(chkc,e,tp) end
+	if chk==0 then return Duel.GetLocationCount(tp,LOCATION_MZONE)>0
+		and Duel.IsExistingTarget(s.spfilter3,tp,LOCATION_SZONE,0,1,nil,e,tp) end
+	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_SPSUMMON)
+	local g=c:GetEquipGroup():Filter(s.spfilter3,nil,e,tp):Select(tp,1,1,nil)
+	Duel.SetTargetCard(g)
+	Duel.SetOperationInfo(0,CATEGORY_SPECIAL_SUMMON,g,1,0,0)
+end
+function s.spop3(e,tp,eg,ep,ev,re,r,rp)
+	local tc=Duel.GetFirstTarget()
+	if tc and tc:IsRelateToEffect(e) then
+		Duel.SpecialSummon(tc,0,tp,tp,false,false,POS_FACEUP)
 	end
-end
-
--- =========================================================
--- Double Attack Inheritance
--- =========================================================
-
-function s.regcon(e,tp,eg,ep,ev,re,r,rp)
-	local rc=e:GetHandler():GetReasonCard()
-
-	return r==REASON_SUMMON
-		and rc
-		and rc:IsCode(
-			21208154,
-			62180201,
-			57793869
-		)
-end
-
-function s.regop(e,tp,eg,ep,ev,re,r,rp)
-	local rc=e:GetHandler():GetReasonCard()
-	if not rc then return end
-
-	local e1=Effect.CreateEffect(e:GetHandler())
-	e1:SetDescription(aux.Stringid(id,3))
-	e1:SetType(EFFECT_TYPE_SINGLE)
-	e1:SetCode(EFFECT_EXTRA_ATTACK)
-	e1:SetValue(1)
-	e1:SetReset(RESET_EVENT+RESETS_STANDARD)
-
-	rc:RegisterEffect(e1)
 end

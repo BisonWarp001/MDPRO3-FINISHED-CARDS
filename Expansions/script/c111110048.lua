@@ -32,7 +32,7 @@ end
 -- Lógica de Búsqueda (1) - Igual que antes
 function s.thfilter1(c,tp)
 	return (aux.IsCodeListed(c,10000000) or aux.IsCodeListed(c,10000010) or aux.IsCodeListed(c,10000020))
-		and c:IsType(TYPE_SPELL+TYPE_TRAP) and c:IsAbleToHand()
+		and c:IsType(TYPE_SPELL+TYPE_TRAP) and c:IsAbleToHand() and not c:IsCode(id)
 		and Duel.IsExistingMatchingCard(s.thfilter2,tp,LOCATION_DECK+LOCATION_GRAVE,0,1,c)
 end
 function s.thfilter2(c)

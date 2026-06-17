@@ -1,101 +1,101 @@
---Archangel Malak’el, the Prime Vanguard
+-- Malicious Coston (Retrain de Double Coston)
 local s,id=GetID()
 function s.initial_effect(c)
-    -- (1) Special Summon desde la mano
-    local e1=Effect.CreateEffect(c)
-    e1:SetDescription(aux.Stringid(id,0))
-    e1:SetCategory(CATEGORY_SPECIAL_SUMMON)
-    e1:SetType(EFFECT_TYPE_IGNITION)
-    e1:SetRange(LOCATION_HAND)
-    e1:SetCountLimit(1,id)
-    e1:SetCondition(s.spcon)
-    e1:SetTarget(s.sptg)
-    e1:SetOperation(s.spop)
-    c:RegisterEffect(e1)
-
-    -- (2) Add 1 "Archangel" monster (Normal o Especial desde MANO)
-    local e2=Effect.CreateEffect(c)
-    e2:SetDescription(aux.Stringid(id,1))
-    e2:SetCategory(CATEGORY_TOHAND+CATEGORY_SEARCH)
-    e2:SetType(EFFECT_TYPE_SINGLE+EFFECT_TYPE_TRIGGER_O)
-    e2:SetProperty(EFFECT_FLAG_DELAY)
-    e2:SetCode(EVENT_SUMMON_SUCCESS)
-    e2:SetCountLimit(1,id+1)
-    e2:SetTarget(s.addtg)
-    e2:SetOperation(s.addop)
-    c:RegisterEffect(e2)
-    local e2b=e2:Clone()
-    e2b:SetCode(EVENT_SPSUMMON_SUCCESS)
-    e2b:SetCondition(s.hndcon) -- Solo si viene de mano como pide el texto
-    c:RegisterEffect(e2b)
-
-    -- (3) Destruir Spell/Trap en End Phase
-    local e3=Effect.CreateEffect(c)
-    e3:SetDescription(aux.Stringid(id,2))
-    e3:SetCategory(CATEGORY_DESTROY)
-    e3:SetType(EFFECT_TYPE_FIELD+EFFECT_TYPE_TRIGGER_O)
-    e3:SetCode(EVENT_PHASE+PHASE_END)
-    e3:SetRange(LOCATION_GY)
-    e3:SetCountLimit(1,id+2)
-    e3:SetCondition(s.descon)
-    e3:SetTarget(s.destg)
-    e3:SetOperation(s.desop)
-    c:RegisterEffect(e3)
+	-- Lista de códigos asociados (The Wicked Avatar, Dreadroot, Eraser)
+	aux.AddCodeList(c,21208154,62180201,57793869)
+	
+	-- (1) Invocación Especial desde la mano
+	local e1=Effect.CreateEffect(c)
+	e1:SetDescription(aux.Stringid(id,0))
+	e1:SetCategory(CATEGORY_SPECIAL_SUMMON+CATEGORY_TODECK)
+	e1:SetType(EFFECT_TYPE_IGNITION)
+	e1:SetRange(LOCATION_HAND)
+	e1:SetCountLimit(1,id)
+	e1:SetCost(s.spcost)
+	e1:SetTarget(s.sptg)
+	e1:SetOperation(s.spop)
+	c:RegisterEffect(e1)
+	
+	-- (2) Tratar como 2 tributos para un monstruo DARK
+	local e2=Effect.CreateEffect(c)
+	e2:SetType(EFFECT_TYPE_SINGLE)
+	e2:SetCode(EFFECT_DOUBLE_TRIBUTE)
+	e2:SetValue(s.dcval)
+	c:RegisterEffect(e2)
+	
+	-- (3) Durante tu Main Phase: Excavar, Invocar o enviar al GY
+	local e3=Effect.CreateEffect(c)
+	e3:SetDescription(aux.Stringid(id,1))
+	e3:SetCategory(CATEGORY_SPECIAL_SUMMON+CATEGORY_TOGRAVE+CATEGORY_DECKDES)
+	e3:SetType(EFFECT_TYPE_IGNITION)
+	e3:SetRange(LOCATION_MZONE)
+	e3:SetCountLimit(1,id+100)
+	e3:SetTarget(s.exctg)
+	e3:SetOperation(s.excop)
+	c:RegisterEffect(e3)
 end
 
--- Filtro del Arquetipo (Ajusta 0x3e8 si ese es tu SetCode real)
-s.listed_series={0x3e8}
-
--- (1) Lógica Special Summon
-function s.spcon(e,tp,eg,ep,ev,re,r,rp)
-    return Duel.GetFieldGroupCount(tp,LOCATION_MZONE,0)==0 
-        or Duel.GetFieldGroupCount(tp,0,LOCATION_MZONE)>0
+-- Filtro de cartas que mencionan a los Dioses Malvados
+function s.cfilter(c)
+	return (aux.IsCodeListed(c,21208154) or aux.IsCodeListed(c,62180201) or aux.IsCodeListed(c,57793869)) 
+		and c:IsAbleToDeck()
 end
+
+-- Costo del Efecto (1)
+function s.spcost(e,tp,eg,ep,ev,re,r,rp,chk)
+	if chk==0 then return Duel.IsExistingMatchingCard(s.cfilter,tp,LOCATION_HAND,0,1,e:GetHandler()) end
+	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_TODECK)
+	local g=Duel.SelectMatchingCard(tp,s.cfilter,tp,LOCATION_HAND,0,1,1,e:GetHandler())
+	Duel.ConfirmCards(1-tp,g)
+	Duel.SendtoDeck(g,nil,SEQ_DECKSHUFFLE,REASON_COST)
+end
+
 function s.sptg(e,tp,eg,ep,ev,re,r,rp,chk)
-    if chk==0 then return Duel.GetLocationCount(tp,LOCATION_MZONE)>0
-        and e:GetHandler():IsCanBeSpecialSummoned(e,0,tp,false,false) end
-    Duel.SetOperationInfo(0,CATEGORY_SPECIAL_SUMMON,e:GetHandler(),1,0,0)
+	if chk==0 then return Duel.GetLocationCount(tp,LOCATION_MZONE)>0
+		and e:GetHandler():IsCanBeSpecialSummoned(e,0,tp,false,false) end
+	Duel.SetOperationInfo(0,CATEGORY_SPECIAL_SUMMON,e:GetHandler(),1,0,0)
 end
+
 function s.spop(e,tp,eg,ep,ev,re,r,rp)
-    local c=e:GetHandler()
-    if c:IsRelateToEffect(e) then
-        Duel.SpecialSummon(c,0,tp,tp,false,false,POS_FACEUP)
-    end
+	local c=e:GetHandler()
+	if c:IsRelateToEffect(e) then
+		Duel.SpecialSummon(c,0,tp,tp,false,false,POS_FACEUP)
+	end
 end
 
--- (2) Lógica de Búsqueda
-function s.hndcon(e,tp,eg,ep,ev,re,r,rp)
-    return e:GetHandler():IsPreviousLocation(LOCATION_HAND)
-end
-function s.addfilter(c)
-    return c:IsSetCard(0x3e8) and c:IsType(TYPE_MONSTER) and not c:IsCode(id) and c:IsAbleToHand()
-end
-function s.addtg(e,tp,eg,ep,ev,re,r,rp,chk)
-    if chk==0 then return Duel.IsExistingMatchingCard(s.addfilter,tp,LOCATION_DECK,0,1,nil) end
-    Duel.SetOperationInfo(0,CATEGORY_TOHAND,nil,1,tp,LOCATION_DECK)
-end
-function s.addop(e,tp,eg,ep,ev,re,r,rp)
-    Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_ATOHAND)
-    local g=Duel.SelectMatchingCard(tp,s.addfilter,tp,LOCATION_DECK,0,1,1,nil)
-    if #g>0 then
-        Duel.SendtoHand(g,nil,REASON_EFFECT)
-        Duel.ConfirmCards(1-tp,g)
-    end
+-- Validación para el efecto (2)
+function s.dcval(e,c)
+	return c:IsAttribute(ATTRIBUTE_DARK)
 end
 
--- (3) Lógica de Destrucción
-function s.descon(e,tp,eg,ep,ev,re,r,rp)
-    return e:GetHandler():IsReason(REASON_TO_GRAVE) -- Verifica que fue enviado al cementerio
+-- Target del Efecto (3) [CORREGIDO]
+function s.exctg(e,tp,eg,ep,ev,re,r,rp,chk)
+	if chk==0 then return Duel.GetFieldGroupCount(tp,LOCATION_DECK,0)>0 end
+	-- Se usa SetOperationInfo estándar con cantidad 0 al ser un efecto incierto (Excavar)
+	Duel.SetOperationInfo(0,CATEGORY_SPECIAL_SUMMON,nil,0,tp,LOCATION_DECK)
+	Duel.SetOperationInfo(0,CATEGORY_TOGRAVE,nil,0,tp,LOCATION_DECK)
 end
-function s.destg(e,tp,eg,ep,ev,re,r,rp,chk)
-    local g=Duel.GetMatchingGroup(Card.IsType,tp,0,LOCATION_SZONE,nil,TYPE_SPELL+TYPE_TRAP)
-    if chk==0 then return #g>0 end
-    Duel.SetOperationInfo(0,CATEGORY_DESTROY,g,1,0,0)
-end
-function s.desop(e,tp,eg,ep,ev,re,r,rp)
-    Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_DESTROY)
-    local g=Duel.SelectMatchingCard(tp,Card.IsType,tp,0,LOCATION_SZONE,1,1,nil,TYPE_SPELL+TYPE_TRAP)
-    if #g>0 then
-        Duel.Destroy(g,REASON_EFFECT)
-    end
+
+-- Operación del Efecto (3) [OPTIMIZADO]
+function s.excop(e,tp,eg,ep,ev,re,r,rp)
+	if Duel.GetFieldGroupCount(tp,LOCATION_DECK,0)==0 then return end
+	Duel.ConfirmDecktop(tp,1)
+	local g=Duel.GetDecktopGroup(tp,1)
+	local tc=g:GetFirst()
+	if not tc then return end
+	
+	-- Comprobar si es monstruo y si es posible invocarlo
+	if tc:IsType(TYPE_MONSTER)
+		and Duel.GetLocationCount(tp,LOCATION_MZONE)>0
+		and tc:IsCanBeSpecialSummoned(e,0,tp,false,false)
+		and Duel.SelectYesNo(tp,aux.Stringid(id,2)) then
+		
+		Duel.DisableShuffleCheck()
+		Duel.SpecialSummon(tc,0,tp,tp,false,false,POS_FACEUP)
+	else
+		-- Si no se invoca, va al cementerio y se baraja el mazo
+		Duel.DisableShuffleCheck()
+		Duel.SendtoGrave(tc,REASON_EFFECT)
+		Duel.ShuffleDeck(tp)
+	end
 end

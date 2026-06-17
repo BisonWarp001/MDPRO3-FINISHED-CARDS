@@ -1,27 +1,28 @@
---Sun God Dragon 
+-- Solar Dragon God
 local s,id=GetID()
 
 function s.initial_effect(c)
-	-- Mención de los Dioses
+	-- Mención de The Winged Dragon of Ra (Código: 10000010)
 	aux.AddCodeList(c,10000010)
 
-	-- Activación: No puede ser negada
+	-- Activación: No puede ser negada, ni sus efectos negados
 	local e1=Effect.CreateEffect(c)
 	e1:SetType(EFFECT_TYPE_ACTIVATE)
 	e1:SetCode(EVENT_FREE_CHAIN)
 	e1:SetProperty(EFFECT_FLAG_CANNOT_INACTIVATE+EFFECT_FLAG_CANNOT_DISABLE+EFFECT_FLAG_CAN_FORBIDDEN)
+	e1:SetCountLimit(1,id+EFFECT_COUNT_CODE_OATH) -- Solo 1 activación por turno
 	e1:SetTarget(s.target)
 	e1:SetOperation(s.activate)
 	c:RegisterEffect(e1)
 end
 
 -------------------------------------------------
--- TARGET
+-- TARGET (Mecánica "Choose": No Selecciona)
 -------------------------------------------------
 function s.filter(c)
 	return c:IsFaceup()
-		and (c:IsCode(10000010))
-		and c:GetFlagEffect(id)==0
+		and c:IsCode(10000010) -- The Winged Dragon of Ra
+		and c:GetFlagEffect(id)==0 -- Que no esté afectado por esta misma carta
 end
 
 function s.target(e,tp,eg,ep,ev,re,r,rp,chk)
@@ -34,19 +35,19 @@ end
 -- OPERACIÓN PRINCIPAL
 -------------------------------------------------
 function s.activate(e,tp,eg,ep,ev,re,r,rp)
+	local c=e:GetHandler()
 	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_APPLYTO)
 	local tc=Duel.SelectMatchingCard(tp,s.filter,tp,LOCATION_MZONE,0,1,1,nil):GetFirst()
 	if not tc then return end
 
-	local c=e:GetHandler()
-
-	-- Registro de Flag y Client Hint visual
+	-- Registro de Flag para evitar doble aplicación
 	tc:RegisterFlagEffect(id,RESET_EVENT+RESETS_STANDARD,EFFECT_FLAG_CLIENT_HINT,1,0,aux.Stringid(id,0))
-
-	-- Limpiar negaciones previas y proteger efectos (No pueden ser negados)
+	
+	-- LIMPIEZA DE NEGACIONES PREVIAS
 	tc:ResetEffect(EFFECT_DISABLE,RESET_CODE)
 	tc:ResetEffect(EFFECT_DISABLE_EFFECT,RESET_CODE)
-	
+
+	-- Sus efectos no pueden ser negados (EFFECT_CANNOT_DISABLE)
 	local e0=Effect.CreateEffect(c)
 	e0:SetType(EFFECT_TYPE_SINGLE)
 	e0:SetProperty(EFFECT_FLAG_SINGLE_RANGE+EFFECT_FLAG_CANNOT_DISABLE)
@@ -55,39 +56,7 @@ function s.activate(e,tp,eg,ep,ev,re,r,rp)
 	e0:SetReset(RESET_EVENT+RESETS_STANDARD)
 	tc:RegisterEffect(e0,true)
 
-	-- Aplicar Protecciones Comunes (Material e Inmunidad Reforzada)
-	s.apply_common(tc,c)
-
-	-- Aplicar Efectos Ganados específicos
-	if tc:IsCode(10000010) then
-		s.apply_ra(tc,c)
-	end
-end
-
------------------------------------------------------------
--- PROTECCIONES COMUNES (LA CLAVE VS MIRRORJADE)
------------------------------------------------------------
-function s.apply_common(tc,c)
-	-- ① No puede ser usado como material
-	local e1=Effect.CreateEffect(c)
-	e1:SetType(EFFECT_TYPE_SINGLE)
-	e1:SetCode(EFFECT_CANNOT_BE_MATERIAL)
-	e1:SetValue(aux.FilterBoolFunction(Card.IsType,TYPE_SPECIAL))
-	e1:SetReset(RESET_EVENT+RESETS_STANDARD)
-	tc:RegisterEffect(e1,true)
-
-	-- ② Inmune a efectos ACTIVADOS del oponente (Prioridad Máxima)
-	local e2=Effect.CreateEffect(c)
-	e2:SetType(EFFECT_TYPE_SINGLE)
-	e2:SetCode(EFFECT_IMMUNE_EFFECT)
-	-- Se añade UNCOPYABLE y CANNOT_DISABLE para que el motor no lo ignore en resoluciones complejas
-	e2:SetProperty(EFFECT_FLAG_SINGLE_RANGE+EFFECT_FLAG_CANNOT_DISABLE+EFFECT_FLAG_UNCOPYABLE)
-	e2:SetRange(LOCATION_MZONE)
-	e2:SetValue(s.efilter)
-	e2:SetReset(RESET_EVENT+RESETS_STANDARD)
-	tc:RegisterEffect(e2,true)
-
-	-- Impedir que sus efectos activados sean negados
+	-- Impedir que la activación de sus efectos sea negada
 	local e3=Effect.CreateEffect(c)
 	e3:SetType(EFFECT_TYPE_FIELD)
 	e3:SetCode(EFFECT_CANNOT_INACTIVATE)
@@ -99,20 +68,48 @@ function s.apply_common(tc,c)
 	local e4=e3:Clone()
 	e4:SetCode(EFFECT_CANNOT_DISEFFECT)
 	tc:RegisterEffect(e4,true)
+
+	-- ● Unaffected by your opponent's activated effects.
+	local e2=Effect.CreateEffect(c)
+	e2:SetType(EFFECT_TYPE_SINGLE)
+	e2:SetCode(EFFECT_IMMUNE_EFFECT)
+	e2:SetProperty(EFFECT_FLAG_SINGLE_RANGE+EFFECT_FLAG_CANNOT_DISABLE)
+	e2:SetRange(LOCATION_MZONE)
+	e2:SetValue(s.efilter)
+	e2:SetReset(RESET_EVENT+RESETS_STANDARD)
+	tc:RegisterEffect(e2,true)
+
+	-- ● Your opponent cannot use it as material for a Special Summon.
+	local e1=Effect.CreateEffect(c)
+	e1:SetType(EFFECT_TYPE_SINGLE)
+	e1:SetCode(EFFECT_CANNOT_BE_MATERIAL)
+	e1:SetValue(function(e,sc,st)
+		return st==1-e:GetHandlerPlayer()
+	end)
+	e1:SetReset(RESET_EVENT+RESETS_STANDARD)
+	tc:RegisterEffect(e1,true)
+
+	-- ● Efecto Ganado: Modo Fénix Rápido en Main/Battle de tu oponente
+	local e5=Effect.CreateEffect(c)
+	e5:SetDescription(aux.Stringid(id,1))
+	e5:SetType(EFFECT_TYPE_QUICK_O)
+	e5:SetCode(EVENT_FREE_CHAIN)
+	e5:SetRange(LOCATION_MZONE)
+	e5:SetCountLimit(1)
+	e5:SetHintTiming(0,TIMINGS_CHECK_MONSTER+TIMING_MAIN_END+TIMING_BATTLE_START+TIMING_ATTACK+TIMING_BATTLE_END)
+	e5:SetCondition(s.racon)
+	e5:SetTarget(s.ratg)
+	e5:SetOperation(s.raop)
+	e5:SetReset(RESET_EVENT+RESETS_STANDARD)
+	tc:RegisterEffect(e5,true)
 end
 
+-------------------------------------------------
+-- FILTROS DE PROTECCIÓN
+-------------------------------------------------
 function s.efilter(e,te)
-	-- 1. No proteger de tus propios efectos (para que tus cartas sigan funcionando en tus Dioses)
-	if te:GetOwnerPlayer()==e:GetHandlerPlayer() then return false end
-
-	-- 2. Si el efecto se ACTIVA (como el remover de Mirrorjade o un Raigeki), el Dios es INMUNE.
-	if te:IsActivated() then return true end
-
-	-- 3. Si NO es un efecto Continuo ni de Campo (como la destrucción de Mirrorjade en la End Phase),
-	-- el Dios también es INMUNE. Esto cubre los efectos residuales.
-	return not te:IsHasType(EFFECT_TYPE_CONTINUOUS) and not te:IsHasType(EFFECT_TYPE_FIELD)
+	return te:GetOwnerPlayer()~=e:GetHandlerPlayer() and te:IsActivated()
 end
-
 
 function s.negfilter(e,ct)
 	local te=Duel.GetChainInfo(ct,CHAININFO_TRIGGERING_EFFECT)
@@ -120,79 +117,38 @@ function s.negfilter(e,ct)
 end
 
 -------------------------------------------------
--- RA
+-- EFECTO GANADO (QUICK EFFECT RA)
 -------------------------------------------------
-function s.apply_ra(tc,c)
-	local e1=Effect.CreateEffect(c)
-	e1:SetDescription(aux.Stringid(id,1))
-	e1:SetCategory(CATEGORY_ATKCHANGE+CATEGORY_DEFCHANGE)
-	e1:SetType(EFFECT_TYPE_QUICK_O)
-	e1:SetCode(EVENT_FREE_CHAIN)
-	e1:SetHintTiming(0,TIMINGS_CHECK_MONSTER_E)
-	e1:SetRange(LOCATION_MZONE)
-	e1:SetCountLimit(1)
-	e1:SetCost(s.racost)
-	e1:SetOperation(s.raop)
-	e1:SetReset(RESET_EVENT+RESETS_STANDARD)
-	tc:RegisterEffect(e1,true)
+function s.racon(e,tp,eg,ep,ev,re,r,rp)
+	-- Solo durante la Main Phase o Battle Phase del OPONENTE
+	local ph=Duel.GetCurrentPhase()
+	return Duel.GetTurnPlayer()~=tp and (ph==PHASE_MAIN1 or ph==PHASE_MAIN2 or (ph>=PHASE_BATTLE_START and ph<=PHASE_BATTLE))
 end
 
-function s.racost(e,tp,eg,ep,ev,re,r,rp,chk)
-	local c=e:GetHandler()
-	local g=Duel.GetReleaseGroup(tp):Filter(function(rc)
-		return rc~=c
-	end,nil)
-
-	if chk==0 then return #g>0 end
-
-	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_RELEASE)
-	local rg=g:Select(tp,1,#g,nil)
-
-	local atk,def=0,0
-	for rc in aux.Next(rg) do
-		atk=atk+math.max(rc:GetAttack(),0)
-		def=def+math.max(rc:GetDefense(),0)
-	end
-
-	e:SetLabel(atk,def)
-
-	Duel.Release(rg,REASON_COST)
+function s.ratg(e,tp,eg,ep,ev,re,r,rp,chk)
+	if chk==0 then return e:GetHandler():IsFaceup() end
 end
 
 function s.raop(e,tp,eg,ep,ev,re,r,rp)
 	local c=e:GetHandler()
-	if not c:IsFaceup() or not c:IsRelateToEffect(e) then return end
-
-	local atk,def=e:GetLabel()
-
-	-- Gain ATK
-	local e1=Effect.CreateEffect(c)
-	e1:SetType(EFFECT_TYPE_SINGLE)
-	e1:SetCode(EFFECT_UPDATE_ATTACK)
-	e1:SetValue(atk)
-	e1:SetReset(RESET_EVENT+RESETS_STANDARD)
-	c:RegisterEffect(e1)
-
-	-- Gain DEF
-	local e2=e1:Clone()
-	e2:SetCode(EFFECT_UPDATE_DEFENSE)
-	e2:SetValue(def)
-	c:RegisterEffect(e2)
-
-	-- Cannot declare attacks except with Ra
-	local e3=Effect.CreateEffect(c)
-	e3:SetType(EFFECT_TYPE_FIELD)
-	e3:SetCode(EFFECT_CANNOT_ATTACK_ANNOUNCE)
-	e3:SetProperty(EFFECT_FLAG_IGNORE_IMMUNE)
-	e3:SetTargetRange(LOCATION_MZONE,0)
-	e3:SetTarget(function(e,tc)
-		return tc~=e:GetHandler()
-	end)
-	e3:SetReset(RESET_PHASE|PHASE_END)
-	Duel.RegisterEffect(e3,tp)
-end
-
--- Función auxiliar: Deshabilita el ataque a cualquier monstruo que NO sea el dueño de este efecto (Ra)
-function s.atklimit(e,c)
-	return c~=e:GetOwner()
+	if c:IsRelateToEffect(e) and c:IsFaceup() then
+		-- Indestructible por batalla hasta el final del turno
+		local e1=Effect.CreateEffect(c)
+		e1:SetType(EFFECT_TYPE_SINGLE)
+		e1:SetCode(EFFECT_INDESTRUCTABLE_BATTLE)
+		e1:SetValue(1)
+		e1:SetReset(RESET_EVENT+RESETS_STANDARD+RESET_PHASE+PHASE_END)
+		c:RegisterEffect(e1)
+		
+		-- El jugador no recibe daño de batalla involucrando a esta carta hasta el final del turno
+		local e2=Effect.CreateEffect(c)
+		e2:SetType(EFFECT_TYPE_SINGLE)
+		e2:SetCode(EFFECT_AVOID_BATTLE_DAMAGE)
+		e2:SetValue(1)
+		e2:SetReset(RESET_EVENT+RESETS_STANDARD+RESET_PHASE+PHASE_END)
+		c:RegisterEffect(e2)
+		
+		-- Animación/Aviso visual del Dios en pantalla
+		Duel.Hint(HINT_CARD,0,10000010)
+	end
 end
