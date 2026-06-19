@@ -89,13 +89,12 @@ function s.initial_effect(c)
     e8:SetValue(s.immfilter)
     c:RegisterEffect(e8)
 
-    -- Negate up to 3 times per turn
+        -- Negate up to 3 times per turn (Quick Effect)
     local e9=Effect.CreateEffect(c)
     e9:SetDescription(aux.Stringid(id,1))
     e9:SetCategory(CATEGORY_NEGATE+CATEGORY_DESTROY)
     e9:SetType(EFFECT_TYPE_QUICK_O)
     e9:SetCode(EVENT_CHAINING)
-    e9:SetProperty(EFFECT_FLAG_DAMAGE_STEP+EFFECT_FLAG_DAMAGE_CAL)
     e9:SetRange(LOCATION_MZONE)
     e9:SetCountLimit(3,id+100)
     e9:SetCondition(s.negcon)
@@ -156,7 +155,7 @@ function s.statop(e,tp,eg,ep,ev,re,r,rp)
     local atk,def=0,0
     for tc in aux.Next(mg) do
         atk=atk+math.max(tc:GetPreviousAttackOnField(),0)
-		def=def+math.max(tc:GetPreviousDefenseOnField(),0)
+        def=def+math.max(tc:GetPreviousDefenseOnField(),0)
     end
     c:RegisterFlagEffect(id,RESET_EVENT|RESETS_STANDARD,0,1,atk)
     c:RegisterFlagEffect(id+1,RESET_EVENT|RESETS_STANDARD,0,1,def)
@@ -170,36 +169,39 @@ function s.defval(e,c)
     return c:GetFlagEffectLabel(id+1)
 end
 
--- Reemplaza la función de inmunidad original por esta:
+-- Immunity Filter
 function s.immfilter(e,te)
-    -- El monstruo es inmune a efectos de cartas del OPONENTE
-    -- Esto evita que sea inmune a sus propios efectos activados
     return te:GetOwnerPlayer()~=e:GetHandlerPlayer()
 end
 
--- Negate (Efecto Rápido - Hasta 3 veces por turno)
+-- Negation
 function s.negcon(e,tp,eg,ep,ev,re,r,rp)
-    -- Evita activar la negación en mitad de una cadena si el monstruo ha dejado el campo
-    if e:GetHandler():IsStatus(STATUS_BATTLE_DESTROYED) then return false end
     return rp~=tp and Duel.IsChainNegatable(ev)
 end
 
 function s.negtg(e,tp,eg,ep,ev,re,r,rp,chk)
+    local rc=re:GetHandler()
     if chk==0 then return true end
-    Duel.SetOperationInfo(0,CATEGORY_NEGATE,eg,1,0,0)
-    -- Si la carta que se va a negar se puede destruir, se añade a la información
-    if re:GetHandler():IsDestructable() and re:GetHandler():IsRelateToEffect(re) then
-        Duel.SetOperationInfo(0,CATEGORY_DESTROY,eg,1,0,0)
+
+    Duel.SetOperationInfo(0,CATEGORY_NEGATE,nil,1,0,0)
+
+    if rc:IsRelateToChain(ev) and rc:IsDestructable() then
+        Duel.SetOperationInfo(0,CATEGORY_DESTROY,rc,1,0,0)
     end
 end
 
 function s.negop(e,tp,eg,ep,ev,re,r,rp)
-    -- Primero niega la activación de la cadena (ev)
-    if Duel.NegateActivation(ev) then
-        local rc=re:GetHandler()
-        -- Si la carta sigue relacionada al efecto, la destruye
-        if rc and rc:IsRelateToEffect(re) then
-            Duel.Destroy(rc,REASON_EFFECT)
-        end
+    local rc=re:GetHandler()
+
+    local negated=false
+
+    if re:IsHasType(EFFECT_TYPE_ACTIVATE) then
+        negated=Duel.NegateActivation(ev)
+    else
+        negated=Duel.NegateEffect(ev)
+    end
+
+    if negated and rc and rc:IsRelateToChain(ev) and rc:IsDestructable() then
+        Duel.Destroy(rc,REASON_EFFECT)
     end
 end
