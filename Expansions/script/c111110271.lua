@@ -12,8 +12,20 @@ function s.initial_effect(c)
         Card.IsAbleToGraveAsCost,
         LOCATION_MZONE,
         0,
-        Duel.SendtoGrave,
-        REASON_COST
+        function(g)
+            local atk,def=0,0
+            local tc=g:GetFirst()
+            while tc do
+                atk=atk+math.max(tc:GetAttack(),0)
+                def=def+math.max(tc:GetDefense(),0)
+                tc=g:GetNext()
+            end
+
+            s.material_atk=atk
+            s.material_def=def
+
+            Duel.SendtoGrave(g,REASON_COST)
+        end
     )
 
     -- Summon restriction
@@ -58,7 +70,7 @@ function s.initial_effect(c)
     e4:SetOperation(s.banop)
     c:RegisterEffect(e4)
 
-    -- Register ATK/DEF
+    -- Register ATK/DEF on summon
     local e5=Effect.CreateEffect(c)
     e5:SetType(EFFECT_TYPE_SINGLE+EFFECT_TYPE_CONTINUOUS)
     e5:SetCode(EVENT_SPSUMMON_SUCCESS)
@@ -80,7 +92,7 @@ function s.initial_effect(c)
     e7:SetValue(s.defval)
     c:RegisterEffect(e7)
 
-    -- Immunity
+    -- Unaffected by other card effects
     local e8=Effect.CreateEffect(c)
     e8:SetType(EFFECT_TYPE_SINGLE)
     e8:SetProperty(EFFECT_FLAG_SINGLE_RANGE)
@@ -89,7 +101,7 @@ function s.initial_effect(c)
     e8:SetValue(s.immfilter)
     c:RegisterEffect(e8)
 
-        -- Negate up to 3 times per turn (Quick Effect)
+    -- Negate up to 3 times per turn
     local e9=Effect.CreateEffect(c)
     e9:SetDescription(aux.Stringid(id,1))
     e9:SetCategory(CATEGORY_NEGATE+CATEGORY_DESTROY)
@@ -116,12 +128,12 @@ function s.regop(e,tp,eg,ep,ev,re,r,rp)
     Duel.RegisterFlagEffect(tp,id,RESET_PHASE|PHASE_END,0,1)
 end
 
--- No response on summon
+-- No response when summoned
 function s.sumsuc(e,tp,eg,ep,ev,re,r,rp)
     Duel.SetChainLimitTillChainEnd(aux.FALSE)
 end
 
--- Banish effect
+-- Banish opponent GY
 function s.bancon(e,tp,eg,ep,ev,re,r,rp)
     return e:GetHandler():IsSummonType(SUMMON_TYPE_FUSION)
 end
@@ -148,60 +160,51 @@ function s.banop(e,tp,eg,ep,ev,re,r,rp)
     end
 end
 
--- ATK/DEF calculation
+-- Store ATK/DEF
 function s.statop(e,tp,eg,ep,ev,re,r,rp)
     local c=e:GetHandler()
-    local mg=c:GetMaterial()
-    local atk,def=0,0
-    for tc in aux.Next(mg) do
-        atk=atk+math.max(tc:GetPreviousAttackOnField(),0)
-        def=def+math.max(tc:GetPreviousDefenseOnField(),0)
-    end
-    c:RegisterFlagEffect(id,RESET_EVENT|RESETS_STANDARD,0,1,atk)
-    c:RegisterFlagEffect(id+1,RESET_EVENT|RESETS_STANDARD,0,1,def)
+
+    local atk=s.material_atk or 0
+    local def=s.material_def or 0
+
+    c:RegisterFlagEffect(id,RESET_EVENT+RESETS_STANDARD,0,1,atk)
+    c:RegisterFlagEffect(id+1,RESET_EVENT+RESETS_STANDARD,0,1,def)
 end
 
 function s.atkval(e,c)
-    return c:GetFlagEffectLabel(id)
+    return c:GetFlagEffectLabel(id) or 0
 end
 
 function s.defval(e,c)
-    return c:GetFlagEffectLabel(id+1)
+    return c:GetFlagEffectLabel(id+1) or 0
 end
 
--- Immunity Filter
+-- Immunity
 function s.immfilter(e,te)
     return te:GetOwnerPlayer()~=e:GetHandlerPlayer()
 end
 
--- Negation
+-- Negate
 function s.negcon(e,tp,eg,ep,ev,re,r,rp)
     return rp~=tp and Duel.IsChainNegatable(ev)
 end
 
 function s.negtg(e,tp,eg,ep,ev,re,r,rp,chk)
-    local rc=re:GetHandler()
     if chk==0 then return true end
 
     Duel.SetOperationInfo(0,CATEGORY_NEGATE,nil,1,0,0)
 
-    if rc:IsRelateToChain(ev) and rc:IsDestructable() then
+    local rc=re:GetHandler()
+    if rc and rc:IsRelateToChain(ev) and rc:IsDestructable() then
         Duel.SetOperationInfo(0,CATEGORY_DESTROY,rc,1,0,0)
     end
 end
 
 function s.negop(e,tp,eg,ep,ev,re,r,rp)
-    local rc=re:GetHandler()
-
-    local negated=false
-
-    if re:IsHasType(EFFECT_TYPE_ACTIVATE) then
-        negated=Duel.NegateActivation(ev)
-    else
-        negated=Duel.NegateEffect(ev)
-    end
-
-    if negated and rc and rc:IsRelateToChain(ev) and rc:IsDestructable() then
-        Duel.Destroy(rc,REASON_EFFECT)
+    if Duel.NegateActivation(ev) then
+        local rc=re:GetHandler()
+        if rc and rc:IsRelateToChain(ev) and rc:IsDestructable() then
+            Duel.Destroy(rc,REASON_EFFECT)
+        end
     end
 end
