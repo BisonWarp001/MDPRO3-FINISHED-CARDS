@@ -1,191 +1,155 @@
 -- Terror and Despair
 local s,id=GetID()
 
-function s.initial_effect(c)
-	-- Lists "The Wicked Dreadroot"
-	aux.AddCodeList(c,62180201)
+local DREADROOT=62180201
 
-	-- (1) Immunity
+function s.initial_effect(c)
+
+	aux.AddCodeList(c,DREADROOT)
+
+	-- Activate
 	local e1=Effect.CreateEffect(c)
 	e1:SetDescription(aux.Stringid(id,0))
+	e1:SetCategory(CATEGORY_TOHAND+CATEGORY_SEARCH+CATEGORY_DISABLE)
 	e1:SetType(EFFECT_TYPE_ACTIVATE)
 	e1:SetCode(EVENT_FREE_CHAIN)
-	e1:SetProperty(EFFECT_FLAG_CARD_TARGET+EFFECT_FLAG_CANNOT_INACTIVATE+EFFECT_FLAG_CANNOT_DISABLE+EFFECT_FLAG_CAN_FORBIDDEN)
-	e1:SetCountLimit(1,id)
-	e1:SetTarget(s.tg1)
-	e1:SetOperation(s.op1)
+	e1:SetHintTiming(0,TIMINGS_CHECK_MONSTER+TIMING_END_PHASE)
+	e1:SetTarget(s.target)
+	e1:SetOperation(s.activate)
 	c:RegisterEffect(e1)
 
-	-- (2) GY effect
+	-- Activation cannot be negated
 	local e2=Effect.CreateEffect(c)
-	e2:SetDescription(aux.Stringid(id,1))
-	e2:SetCategory(CATEGORY_REMOVE+CATEGORY_DAMAGE)
-	e2:SetType(EFFECT_TYPE_IGNITION)
-	e2:SetRange(LOCATION_GRAVE)
-	e2:SetProperty(EFFECT_FLAG_CARD_TARGET+EFFECT_FLAG_CANNOT_INACTIVATE+EFFECT_FLAG_CANNOT_DISABLE+EFFECT_FLAG_CAN_FORBIDDEN)
-	e2:SetCountLimit(1,id+100)
-	e2:SetCost(aux.bfgcost)
-	e2:SetTarget(s.tg2)
-	e2:SetOperation(s.op2)
+	e2:SetType(EFFECT_TYPE_FIELD)
+	e2:SetCode(EFFECT_CANNOT_INACTIVATE)
+	e2:SetRange(LOCATION_SZONE)
+	e2:SetCondition(s.dreadroot_cond)
+	e2:SetValue(s.protectfilter)
 	c:RegisterEffect(e2)
+
+	-- Effect cannot be negated
+	local e3=e2:Clone()
+	e3:SetCode(EFFECT_CANNOT_DISEFFECT)
+	c:RegisterEffect(e3)
+
 end
 
---------------------------------------------------
--- Shared
---------------------------------------------------
 
 function s.dreadfilter(c)
-	return c:IsFaceup() and c:IsCode(62180201)
+	return c:IsFaceup() and c:IsCode(DREADROOT)
 end
 
---------------------------------------------------
--- Effect (1)
---------------------------------------------------
 
-function s.tg1(e,tp,eg,ep,ev,re,r,rp,chk,chkc)
-	if chkc then
-		return chkc:IsLocation(LOCATION_MZONE)
-			and chkc:IsControler(tp)
-			and s.dreadfilter(chkc)
+function s.dreadroot_cond(e)
+	return Duel.IsExistingMatchingCard(s.dreadfilter,e:GetHandlerPlayer(),LOCATION_MZONE,0,1,nil)
+end
+
+
+function s.protectfilter(e,ct)
+	local te=Duel.GetChainInfo(ct,CHAININFO_TRIGGERING_EFFECT)
+	return te and te:GetHandler()==e:GetHandler()
+end
+
+
+function s.thfilter(c)
+	return c:IsCode(DREADROOT) and c:IsAbleToHand()
+		and (c:IsLocation(LOCATION_DECK) or c:IsLocation(LOCATION_GRAVE)
+		or (c:IsLocation(LOCATION_REMOVED) and c:IsFaceup()))
+end
+
+
+function s.negfilter(c,atk)
+	return c:IsFaceup() and c:GetAttack()<atk
+end
+
+
+function s.target(e,tp,eg,ep,ev,re,r,rp,chk)
+
+	local b1=Duel.IsExistingMatchingCard(s.thfilter,tp,LOCATION_DECK+LOCATION_GRAVE+LOCATION_REMOVED,0,1,nil)
+
+	local dg=Duel.GetMatchingGroup(s.dreadfilter,tp,LOCATION_MZONE,0,nil)
+
+	local b2=false
+	local atk=0
+
+	for tc in aux.Next(dg) do
+		if tc:GetAttack()>atk then
+			atk=tc:GetAttack()
+		end
 	end
-	if chk==0 then
-		return Duel.IsExistingTarget(s.dreadfilter,tp,LOCATION_MZONE,0,1,nil)
-	end
 
-	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_TARGET)
-	Duel.SelectTarget(tp,s.dreadfilter,tp,LOCATION_MZONE,0,1,1,nil)
-end
-
-function s.efilter(e,re)
-	return re:GetOwnerPlayer()~=e:GetHandlerPlayer()
-end
-
-function s.op1(e,tp,eg,ep,ev,re,r,rp)
-	local tc=Duel.GetFirstTarget()
-	if not (tc and tc:IsRelateToEffect(e) and tc:IsFaceup()) then
-		return
-	end
-
-	local e1=Effect.CreateEffect(e:GetHandler())
-	e1:SetType(EFFECT_TYPE_SINGLE)
-	e1:SetCode(EFFECT_IMMUNE_EFFECT)
-	e1:SetValue(s.efilter)
-	e1:SetReset(RESET_EVENT|RESETS_STANDARD|RESET_PHASE|PHASE_END)
-	tc:RegisterEffect(e1)
-end
-
---------------------------------------------------
--- Effect (2)
---------------------------------------------------
-
-function s.fieldfilter(c,atk)
-	return c:IsType(TYPE_MONSTER)
-		and c:GetAttack()<atk
-		and c:IsAbleToRemove()
-end
-
-function s.extrafilter(c,atk)
-	return c:IsType(TYPE_MONSTER)
-		and c:GetBaseAttack()>=0
-		and c:GetBaseAttack()<atk
-		and c:IsAbleToRemove()
-end
-
-function s.tg2(e,tp,eg,ep,ev,re,r,rp,chk,chkc)
-	if chkc then
-		return chkc:IsLocation(LOCATION_MZONE)
-			and chkc:IsControler(tp)
-			and s.dreadfilter(chkc)
+	if atk>0 then
+		b2=Duel.IsExistingMatchingCard(s.negfilter,tp,0,LOCATION_MZONE,1,nil,atk)
 	end
 
 	if chk==0 then
-		return Duel.IsExistingTarget(
-			s.dreadfilter,tp,LOCATION_MZONE,0,1,nil)
+		return b1 or b2
 	end
 
-	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_TARGET)
-	Duel.SelectTarget(tp,s.dreadfilter,tp,LOCATION_MZONE,0,1,1,nil)
+	local op=aux.SelectFromOptions(tp,
+		{b1,aux.Stringid(id,1),1},
+		{b2,aux.Stringid(id,2),2})
 
-	Duel.SetOperationInfo(0,CATEGORY_REMOVE,nil,1,1-tp,
-		LOCATION_MZONE|LOCATION_EXTRA)
-	Duel.SetOperationInfo(0,CATEGORY_DAMAGE,nil,0,1-tp,0)
-end
+	e:SetLabel(op)
 
-function s.op2(e,tp,eg,ep,ev,re,r,rp)
-	local tc=Duel.GetFirstTarget()
-
-	if not (tc and tc:IsRelateToEffect(e) and tc:IsFaceup()) then
-		return
-	end
-
-	local atk=tc:GetAttack()
-
-	local b1=Duel.IsExistingMatchingCard(
-		s.fieldfilter,tp,0,LOCATION_MZONE,1,nil,atk)
-
-	local b2=Duel.IsExistingMatchingCard(
-		s.extrafilter,tp,0,LOCATION_EXTRA,1,nil,atk)
-
-	if not (b1 or b2) then
-		return
-	end
-
-	local op
-
-	if b1 and b2 then
-		op=Duel.SelectOption(tp,
-			aux.Stringid(id,2), -- Field
-			aux.Stringid(id,3)) -- Extra Deck
-	elseif b1 then
-		op=0
-	else
-		op=1
-	end
-
-	local sg=nil
-	local rc=nil
-	local dmg=0
-
-	-- Field
-	if op==0 then
-		Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_REMOVE)
-
-		sg=Duel.SelectMatchingCard(
-			tp,s.fieldfilter,tp,0,LOCATION_MZONE,
-			1,1,nil,atk)
-
-		rc=sg:GetFirst()
-
-		if not rc then return end
-
-		dmg=math.max(0,rc:GetAttack())
-	end
-
-	-- Extra Deck
 	if op==1 then
-		local eg=Duel.GetMatchingGroup(
-			s.extrafilter,tp,0,LOCATION_EXTRA,nil,atk)
-
-		if #eg==0 then return end
-
-		Duel.ConfirmCards(tp,
-			Duel.GetFieldGroup(1-tp,LOCATION_EXTRA,0))
-
-		Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_REMOVE)
-
-		sg=eg:Select(tp,1,1,nil)
-
-		rc=sg:GetFirst()
-
-		if not rc then return end
-
-		dmg=math.max(0,rc:GetBaseAttack())
-
-		Duel.ShuffleExtra(1-tp)
+		e:SetCountLimit(1,id)
+		e:SetCategory(CATEGORY_TOHAND+CATEGORY_SEARCH)
+		Duel.SetOperationInfo(0,CATEGORY_TOHAND,nil,1,tp,LOCATION_DECK+LOCATION_GRAVE+LOCATION_REMOVED)
+	elseif op==2 then
+		e:SetCountLimit(1,id+100)
+		e:SetCategory(CATEGORY_DISABLE)
 	end
 
-	if Duel.Remove(rc,POS_FACEUP,REASON_EFFECT)>0 and dmg>0 then
-		Duel.BreakEffect()
-		Duel.Damage(1-tp,dmg,REASON_EFFECT)
+end
+
+
+function s.activate(e,tp,eg,ep,ev,re,r,rp)
+
+	local op=e:GetLabel()
+
+	if op==1 then
+
+		Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_ATOHAND)
+
+		local g=Duel.SelectMatchingCard(tp,s.thfilter,tp,LOCATION_DECK+LOCATION_GRAVE+LOCATION_REMOVED,0,1,1,nil)
+
+		if g:GetCount()>0 then
+			Duel.SendtoHand(g,nil,REASON_EFFECT)
+			Duel.ConfirmCards(1-tp,g)
+		end
+
+
+	elseif op==2 then
+
+		Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_FACEUP)
+
+		local dg=Duel.SelectMatchingCard(tp,s.dreadfilter,tp,LOCATION_MZONE,0,1,1,nil)
+
+		if dg:GetCount()==0 then
+			return
+		end
+
+		local atk=dg:GetFirst():GetAttack()
+
+		local g=Duel.GetMatchingGroup(s.negfilter,tp,0,LOCATION_MZONE,nil,atk)
+
+		for tc in aux.Next(g) do
+
+			local e1=Effect.CreateEffect(e:GetHandler())
+			e1:SetType(EFFECT_TYPE_SINGLE)
+			e1:SetCode(EFFECT_DISABLE)
+			e1:SetReset(RESET_PHASE+PHASE_END)
+			tc:RegisterEffect(e1)
+
+			local e2=Effect.CreateEffect(e:GetHandler())
+			e2:SetType(EFFECT_TYPE_SINGLE)
+			e2:SetCode(EFFECT_DISABLE_EFFECT)
+			e2:SetReset(RESET_PHASE+PHASE_END)
+			tc:RegisterEffect(e2)
+
+		end
+
 	end
+
 end
