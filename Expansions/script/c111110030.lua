@@ -70,6 +70,9 @@ end
 -------------------------------------------------
 -- ① Negate condition
 -------------------------------------------------
+-------------------------------------------------
+-- ① Negate functions
+-------------------------------------------------
 function s.negcon(e,tp,eg,ep,ev,re,r,rp)
 	local ph=Duel.GetCurrentPhase()
 	return (ph==PHASE_MAIN1 or ph==PHASE_MAIN2)
@@ -78,15 +81,25 @@ end
 
 function s.negtg(e,tp,eg,ep,ev,re,r,rp,chk)
 	if chk==0 then return true end
-	Duel.SetChainLimit(aux.FALSE)  -- Nadie puede encadenar a este efecto
 	Duel.SetOperationInfo(0,CATEGORY_NEGATE,eg,1,0,0)
 	
-	-- CORREGIDO: Se quita la verificación 'IsDestructable()'
-	-- Solo importa que la carta siga relacionada a la cadena al momento de resolver
+	-- Si la carta sigue relacionada al efecto, se marca que se va a destruir
 	if re:GetHandler():IsRelateToEffect(re) then
 		Duel.SetOperationInfo(0,CATEGORY_DESTROY,eg,1,0,0)
 	end
+	
+	-- EFECTO SUPER POLIMERIZACIÓN: Nadie puede responder a esta activación
+	Duel.SetChainLimit(aux.FALSE)
 end
+
+function s.negop(e,tp,eg,ep,ev,re,r,rp)
+	-- Niega la activación del eslabón de la cadena (ev)
+	if Duel.NegateActivation(ev) and re:GetHandler():IsRelateToEffect(re) then
+		-- Si se niega con éxito y la carta sigue ahí, la destruye
+		Duel.Destroy(eg,REASON_EFFECT)
+	end
+end
+
 
 
 -------------------------------------------------

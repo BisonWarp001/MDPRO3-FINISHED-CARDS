@@ -1,4 +1,4 @@
---Nordic Relic Ultima - Mjollnir
+-- Nordic Relic Ultima - Mjollnir
 local s,id=GetID()
 
 s.listed_series={0x42,0x4b,0x5042}
@@ -19,7 +19,7 @@ function s.initial_effect(c)
 	c:RegisterEffect(e1)
 
 	--------------------------------
-	-- ② Opponent cannot activate during Damage Step
+	-- ② Opponent cannot activate during Damage Step (FIXED)
 	--------------------------------
 	local e2=Effect.CreateEffect(c)
 	e2:SetType(EFFECT_TYPE_FIELD)
@@ -28,9 +28,9 @@ function s.initial_effect(c)
 	e2:SetRange(LOCATION_SZONE)
 	e2:SetTargetRange(0,1)
 	e2:SetValue(s.aclimit)
-	e2:SetCondition(s.actcon)
+	e2:SetCondition(s.actcon) -- Comprobación manual de combate
 	c:RegisterEffect(e2)
-
+	
 	--------------------------------
 	-- ③ Search Nordic Relic (HOPT)
 	--------------------------------
@@ -88,16 +88,29 @@ function s.spop(e,tp,eg,ep,ev,re,r,rp)
 end
 
 ------------------------------------------------
--- ② Activation lock during Damage Step only
+-- ② Activation lock during Damage Step (Fixed System)
 ------------------------------------------------
 function s.actcon(e)
-	local c=e:GetHandler()
-	local eqc=c:GetEquipTarget()
+	local eqc=e:GetHandler():GetEquipTarget()
 	if not eqc then return false end
-	if not Duel.IsDamageStep() then return false end
+	local ph=Duel.GetCurrentPhase()
+	-- Verifica manualmente que estemos en la Battle Phase o Damage Step
+	if ph~=PHASE_DAMAGE and ph~=PHASE_BATTLE then return false end
 	local a=Duel.GetAttacker()
 	local d=Duel.GetAttackTarget()
 	return a==eqc or d==eqc
+end
+
+function s.actop(e,tp,eg,ep,ev,re,r,rp)
+	-- Bloquea las activaciones del oponente hasta el final del Damage Step de manera limpia
+	local e1=Effect.CreateEffect(e:GetHandler())
+	e1:SetType(EFFECT_TYPE_FIELD)
+	e1:SetProperty(EFFECT_FLAG_PLAYER_TARGET)
+	e1:SetCode(EFFECT_CANNOT_ACTIVATE)
+	e1:SetTargetRange(0,1)
+	e1:SetValue(s.aclimit)
+	e1:SetReset(RESET_PHASE+PHASE_DAMAGE_INDEX)
+	Duel.RegisterEffect(e1,tp)
 end
 
 function s.aclimit(e,re,tp)

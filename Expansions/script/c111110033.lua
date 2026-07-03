@@ -91,60 +91,59 @@ end
 -------------------------------------------------
 -- ② Tribute → Special Summon Aesir Lv10
 -------------------------------------------------
+-------------------------------------------------
+-- ② Tribute → Special Summon Aesir Lv10 (MATEMÁTICA EXACTA: TOTAL = 10)
+-------------------------------------------------
 function s.relfilter(c)
-    return c:IsFaceup() and c:IsReleasable() and c:GetLevel()>0
+	return c:IsFaceup() and c:IsReleasable() and c:GetLevel()>0
 end
 
 function s.aesirfilter(c,e,tp)
-    return c:IsSetCard(0x4b)
-        and c:IsLevel(10)
-        and c:IsCanBeSpecialSummoned(e,SUMMON_TYPE_SYNCHRO,tp,false,false)
-end
-
-function s.validtribute(tp,c)
-    local g=Duel.GetMatchingGroup(s.relfilter,tp,LOCATION_MZONE,0,c)
-    return aux.SelectUnselectGroup(
-        g,nil,tp,0,2,
-        function(sg) return sg:GetSum(Card.GetLevel)+c:GetLevel()==10 end,
-        0
-    )
+	return c:IsSetCard(0x4b)
+		and c:IsLevel(10)
+		and c:IsCanBeSpecialSummoned(e,SUMMON_TYPE_SYNCHRO,tp,false,false)
 end
 
 function s.spcon(e,tp,eg,ep,ev,re,r,rp)
-    local c=e:GetHandler()
-    return Duel.GetLocationCountFromEx(tp,tp,c)>0
-        and Duel.IsExistingMatchingCard(s.aesirfilter,tp,LOCATION_EXTRA,0,1,nil,e,tp)
-        and s.validtribute(tp,c)
+	local c=e:GetHandler()
+	if Duel.GetLocationCountFromEx(tp,tp,c)<=0 then return false end
+	if not Duel.IsExistingMatchingCard(s.aesirfilter,tp,LOCATION_EXTRA,0,1,nil,e,tp) then return false end
+	
+	-- Comprueba si hay de 1 a 2 monstruos que sumen nivel 4 (para llegar a 10 con ella)
+	local g=Duel.GetMatchingGroup(s.relfilter,tp,LOCATION_MZONE,0,c)
+	return g:CheckWithSumEqual(Card.GetLevel,4,1,2)
 end
 
 function s.spcost(e,tp,eg,ep,ev,re,r,rp,chk)
-    local c=e:GetHandler()
-    if chk==0 then return s.validtribute(tp,c) end
-
-    local g=Duel.GetMatchingGroup(s.relfilter,tp,LOCATION_MZONE,0,c)
-    Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_RELEASE)
-    local rg=aux.SelectUnselectGroup(
-        g,e,tp,0,2,
-        function(sg) return sg:GetSum(Card.GetLevel)+c:GetLevel()==10 end,
-        1,tp,HINTMSG_RELEASE
-    )
-    rg:AddCard(c)
-    Duel.Release(rg,REASON_COST)
+	local c=e:GetHandler()
+	if chk==0 then return s.spcon(e,tp,eg,ep,ev,re,r,rp) end
+	
+	-- El jugador selecciona de 1 a 2 monstruos cuyo nivel sume exactamente 4
+	local g=Duel.GetMatchingGroup(s.relfilter,tp,LOCATION_MZONE,0,c)
+	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_RELEASE)
+	local rg=g:SelectWithSumEqual(tp,Card.GetLevel,4,1,2)
+	
+	-- Se añade obligatoriamente a Brynhildr (Nivel 6) para completar los 10 de nivel total
+	rg:AddCard(c)
+	Duel.Release(rg,REASON_COST)
 end
 
 function s.sptg(e,tp,eg,ep,ev,re,r,rp,chk)
-    return chk==0
+	if chk==0 then return true end
+	Duel.SetOperationInfo(0,CATEGORY_SPECIAL_SUMMON,nil,1,tp,LOCATION_EXTRA)
 end
 
 function s.spop(e,tp,eg,ep,ev,re,r,rp)
-    Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_SPSUMMON)
-    local sg=Duel.SelectMatchingCard(tp,s.aesirfilter,tp,LOCATION_EXTRA,0,1,1,nil,e,tp)
-    local sc=sg:GetFirst()
-    if sc then
-        Duel.SpecialSummon(sc,SUMMON_TYPE_SYNCHRO,tp,tp,false,false,POS_FACEUP)
-        sc:CompleteProcedure()
-    end
+	if Duel.GetLocationCountFromEx(tp,tp,nil)<=0 then return end
+	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_SPSUMMON)
+	local sg=Duel.SelectMatchingCard(tp,s.aesirfilter,tp,LOCATION_EXTRA,0,1,1,nil,e,tp)
+	local sc=sg:GetFirst()
+	if sc then
+		Duel.SpecialSummon(sc,SUMMON_TYPE_SYNCHRO,tp,tp,false,false,POS_FACEUP)
+		sc:CompleteProcedure()
+	end
 end
+
 
 -------------------------------------------------
 -- ③ End Phase revive
