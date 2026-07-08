@@ -1,25 +1,23 @@
 -- Nordic Relic - Andvaranaut Spark
 local s,id=GetID()
-
 s.listed_series={0x42,0x4b,0x5042}
 
 function s.initial_effect(c)
-	-- ① Efecto Principal: Invocación desde Extra Deck
+	-- ① Efecto Principal: Invocación desde Extra Deck (Tratado como Sincronía)
 	local e1=Effect.CreateEffect(c)
 	e1:SetCategory(CATEGORY_SPECIAL_SUMMON+CATEGORY_REMOVE)
 	e1:SetType(EFFECT_TYPE_ACTIVATE)
 	e1:SetCode(EVENT_FREE_CHAIN)
 	e1:SetCountLimit(1,id)
-	-- REGLA IMPERMANENCE: Habilita ventanas de respuesta automáticas en el turno rival
 	e1:SetHintTiming(0,TIMINGS_CHECK_MONSTER+TIMING_MAIN_END+TIMING_BATTLE_START)
 	e1:SetTarget(s.sptg)
 	e1:SetOperation(s.spop)
 	c:RegisterEffect(e1)
 
-	-- ② PERMISO ESTILO IMPERMANENCE: Activar Trampa Normal desde la mano
+	-- ② Trampa de Mano
 	local e2=Effect.CreateEffect(c)
 	e2:SetType(EFFECT_TYPE_SINGLE)
-	e2:SetCode(EFFECT_TRAP_ACT_IN_HAND) -- Código oficial para Trampas de Mano
+	e2:SetCode(EFFECT_TRAP_ACT_IN_HAND)
 	e2:SetCondition(s.handcon)
 	c:RegisterEffect(e2)
 
@@ -28,7 +26,7 @@ function s.initial_effect(c)
 	e3:SetCategory(CATEGORY_DESTROY)
 	e3:SetType(EFFECT_TYPE_IGNITION)
 	e3:SetRange(LOCATION_GRAVE)
-	e3:SetCountLimit(1,id+1)
+	e3:SetCountLimit(1,id+EFFECT_COUNT_CODE_OATH) 
 	e3:SetCost(aux.bfgcost)
 	e3:SetTarget(s.destg)
 	e3:SetOperation(s.desop)
@@ -36,60 +34,83 @@ function s.initial_effect(c)
 end
 
 -------------------------------------------------
--- CONDICIÓN HAND TRAP (Estilo Impermanence)
+-- CONDICIÓN HAND TRAP
 -------------------------------------------------
 function s.handcon(e)
 	local tp=e:GetHandlerPlayer()
-	-- El rival controla al menos 1 monstruo y tú controlas EXACTAMENTE 0 monstruos
 	return Duel.GetFieldGroupCount(tp,0,LOCATION_MZONE)>0 
 		and Duel.GetFieldGroupCount(tp,LOCATION_MZONE,0)==0
 end
 
 -------------------------------------------------
--- ① TARGET Y FILTROS PRINCIPALES
+-- ① LOGICA COMPLETAMENTE ABIERTA (BUGS DE CAMPO LLENO CORREGIDOS)
 -------------------------------------------------
-function s.nordicfilter(c)
-	return c:IsSetCard(0x42) and c:IsType(TYPE_MONSTER) and c:IsAbleToRemove() and c:GetLevel()>0
+function s.nordicfilter(c,tp)
+	return c:IsSetCard(0x42) and c:IsType(TYPE_MONSTER) and c:IsAbleToRemove(tp) and c:GetLevel()>0
 end
 
 function s.aesirfilter(c,e,tp)
-	if not (c:IsSetCard(0x4b) and c:IsType(TYPE_SYNCHRO) 
-		and c:IsCanBeSpecialSummoned(e,SUMMON_TYPE_SYNCHRO,tp,false,false)) then return false end
-	
-	local g=Duel.GetMatchingGroup(s.nordicfilter,tp,LOCATION_HAND+LOCATION_MZONE+LOCATION_DECK+LOCATION_GRAVE,0,nil)
-	return g:CheckWithSumEqual(Card.GetLevel,c:GetLevel(),1,99)
+	return c:IsSetCard(0x4b) and c:IsType(TYPE_SYNCHRO) 
+		and c:IsCanBeSpecialSummoned(e,SUMMON_TYPE_SYNCHRO,tp,false,false)
 end
 
 function s.sptg(e,tp,eg,ep,ev,re,r,rp,chk)
 	if chk==0 then
-		-- Si intentas activarla desde la mano, valida de forma obligatoria la condición de casillas
 		if e:GetHandler():IsLocation(LOCATION_HAND) and not s.handcon(e) then return false end
+		if Duel.IsPlayerAffectedByEffect(tp,EFFECT_CANNOT_REMOVE) then return false end
+		
 		return Duel.IsExistingMatchingCard(s.aesirfilter,tp,LOCATION_EXTRA,0,1,nil,e,tp)
+			and Duel.IsExistingMatchingCard(s.nordicfilter,tp,LOCATION_HAND+LOCATION_MZONE+LOCATION_DECK+LOCATION_GRAVE,0,1,nil,tp)
 	end
 	Duel.SetOperationInfo(0,CATEGORY_SPECIAL_SUMMON,nil,1,tp,LOCATION_EXTRA)
 	Duel.SetOperationInfo(0,CATEGORY_REMOVE,nil,1,tp,LOCATION_HAND+LOCATION_MZONE+LOCATION_DECK+LOCATION_GRAVE)
 end
 
 function s.spop(e,tp,eg,ep,ev,re,r,rp)
-	if Duel.GetLocationCountFromEx(tp,tp,nil)<=0 then return end
+	if Duel.IsPlayerAffectedByEffect(tp,EFFECT_CANNOT_REMOVE) then return end
 	
-	-- 1. Elige al Dios Aesir
+	-- 1. Seleccionar CUALQUIER Aesir de tu Extra Deck
 	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_SPSUMMON)
 	local scg=Duel.SelectMatchingCard(tp,s.aesirfilter,tp,LOCATION_EXTRA,0,1,1,nil,e,tp)
 	local sc=scg:GetFirst()
 	if not sc then return end
 	
-	-- 2. Elige materiales automáticos que sumen su nivel
-	local g=Duel.GetMatchingGroup(s.nordicfilter,tp,LOCATION_HAND+LOCATION_MZONE+LOCATION_DECK+LOCATION_GRAVE,0,nil)
-	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_REMOVE)
-	local mat=g:SelectWithSumEqual(tp,Card.GetLevel,sc:GetLevel(),1,99)
+	-- 2. Recopilar el grupo total de materiales Nordic válidos
+	local g=Duel.GetMatchingGroup(s.nordicfilter,tp,LOCATION_HAND+LOCATION_MZONE+LOCATION_DECK+LOCATION_GRAVE,0,nil,tp)
+	local mat=Group.CreateGroup()
+	local current_lv = 0
+	local target_lv = sc:GetLevel()
 	
-	-- 3. Desierra del Deck/Mano/Campo/GY e Invoca por Sincronía
-	if #mat>0 and Duel.Remove(mat,POS_FACEUP,REASON_EFFECT+REASON_MATERIAL)~=0 then
+	-- 3. Bucle de selección interactivo obligatorio
+	while current_lv < target_lv do
+		local remaining = target_lv - current_lv
+		local tg = g:Filter(function(tc) return tc:GetLevel() <= remaining and not mat:IsContains(tc) end, nil)
+		
+		if #tg == 0 then break end 
+		
+		Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_REMOVE)
+		local sg = tg:Select(tp,1,1,nil)
+		if #sg == 0 then break end
+		
+		local selected_card = sg:GetFirst()
+		mat:AddCard(selected_card)
+		current_lv = current_lv + selected_card:GetLevel()
+	end
+	
+	-- 4. VALIDACIÓN DE ZONAS ACTUALIZADA (Anti-Bug de Campo Lleno):
+	-- Se evalúa el espacio del Extra Deck pasando 'mat' como parámetro. Si desterras monstruos de tu propio campo, 
+	-- el motor simulará que esas zonas se liberan, permitiendo la invocación legal del Dios Aesir.
+	if current_lv == target_lv and #mat > 0 then
+		if Duel.GetLocationCountFromEx(tp,tp,mat,sc)<=0 then return end
+		
 		sc:SetMaterial(mat)
-		if Duel.SpecialSummon(sc,SUMMON_TYPE_SYNCHRO,tp,tp,false,false,POS_FACEUP)>0 then
-			sc:CompleteProcedure()
+		if Duel.Remove(mat,POS_FACEUP,REASON_EFFECT+REASON_MATERIAL)~=0 then
+			if Duel.SpecialSummon(sc,SUMMON_TYPE_SYNCHRO,tp,tp,false,false,POS_FACEUP)>0 then
+				sc:CompleteProcedure()
+			end
 		end
+	else
+		return
 	end
 end
 

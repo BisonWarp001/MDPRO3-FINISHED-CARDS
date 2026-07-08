@@ -1,8 +1,9 @@
+-- Borrson of  the Nordic Ascendant
 local s,id=GetID()
 s.listed_series={0x42,0x4b}
 
 function s.initial_effect(c)
-
+	-- ID de las cartas listadas (Valhalla y Odin)
 	aux.AddCodeList(c,111110040,93483212)
 
 	-------------------------------------------------
@@ -14,7 +15,7 @@ function s.initial_effect(c)
 	e1:SetType(EFFECT_TYPE_SINGLE+EFFECT_TYPE_TRIGGER_O)
 	e1:SetProperty(EFFECT_FLAG_DELAY)
 	e1:SetCode(EVENT_SUMMON_SUCCESS)
-	e1:SetCountLimit(1,id+154)
+	e1:SetCountLimit(1,id) -- Estilo moderno de ID limpio para HOPT
 	e1:SetTarget(s.settg)
 	e1:SetOperation(s.setop)
 	c:RegisterEffect(e1)
@@ -31,7 +32,7 @@ function s.initial_effect(c)
 	e2:SetCategory(CATEGORY_LVCHANGE)
 	e2:SetType(EFFECT_TYPE_IGNITION)
 	e2:SetRange(LOCATION_MZONE)
-	e2:SetCountLimit(1,id+684)
+	e2:SetCountLimit(1,id+100)
 	e2:SetCondition(s.lvcon)
 	e2:SetTarget(s.lvtg)
 	e2:SetOperation(s.lvop)
@@ -47,7 +48,7 @@ function s.initial_effect(c)
 	e3:SetCode(EVENT_CHAINING)
 	e3:SetRange(LOCATION_MZONE+LOCATION_GRAVE)
 	e3:SetProperty(EFFECT_FLAG_DAMAGE_STEP+EFFECT_FLAG_DAMAGE_CAL)
-	e3:SetCountLimit(1,id+819)
+	e3:SetCountLimit(1,id+200)
 	e3:SetCondition(s.negcon)
 	e3:SetCost(s.negcost)
 	e3:SetTarget(s.negtg)
@@ -56,28 +57,25 @@ function s.initial_effect(c)
 end
 
 -------------------------------------------------
--- ① Set Valhalla
+-- ① Set Valhalla (CORREGIDO)
 -------------------------------------------------
-
 function s.setfilter(c)
-	return c:IsCode(111110040)
-		and c:IsType(TYPE_FIELD)
-		and c:IsSSetable()
+	return c:IsCode(111110040) and c:IsSSetable()
 end
 
 function s.settg(e,tp,eg,ep,ev,re,r,rp,chk)
 	if chk==0 then
-		return Duel.GetLocationCount(tp,LOCATION_SZONE)>0
-		and Duel.IsExistingMatchingCard(s.setfilter,tp,LOCATION_DECK,0,1,nil)
+		-- CORRECCIÓN: Para Magias de Campo se revisa la zona de Campo del jugador
+		return Duel.IsExistingMatchingCard(s.setfilter,tp,LOCATION_DECK,0,1,nil)
 	end
 end
 
 function s.setop(e,tp,eg,ep,ev,re,r,rp)
-	if Duel.GetLocationCount(tp,LOCATION_SZONE)<=0 then return end
 	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_SET)
 	local g=Duel.SelectMatchingCard(tp,s.setfilter,tp,LOCATION_DECK,0,1,1,nil)
 	local tc=g:GetFirst()
 	if tc then
+		-- CORRECCIÓN: Duel.SSet coloca automáticamente en la zona correcta según el tipo de carta
 		Duel.SSet(tp,tc)
 	end
 end
@@ -85,23 +83,19 @@ end
 -------------------------------------------------
 -- ② Reducir Nivel
 -------------------------------------------------
-
 function s.lvcon(e,tp,eg,ep,ev,re,r,rp)
 	return Duel.IsMainPhase()
 end
 
 function s.lvtg(e,tp,eg,ep,ev,re,r,rp,chk)
 	local c=e:GetHandler()
-	if chk==0 then
-		return c:IsLevelAbove(2)
-	end
+	if chk==0 then return c:IsLevelAbove(2) end
 	Duel.SetOperationInfo(0,CATEGORY_LVCHANGE,c,1,0,0)
 end
 
 function s.lvop(e,tp,eg,ep,ev,re,r,rp)
 	local c=e:GetHandler()
-	if c:IsFacedown() or not c:IsRelateToEffect(e) or c:IsImmuneToEffect(e) then return end
-
+	if c:IsFacedown() or not c:IsRelateToEffect(e) then return end
 	local e1=Effect.CreateEffect(c)
 	e1:SetType(EFFECT_TYPE_SINGLE)
 	e1:SetCode(EFFECT_UPDATE_LEVEL)
@@ -111,9 +105,8 @@ function s.lvop(e,tp,eg,ep,ev,re,r,rp)
 end
 
 -------------------------------------------------
--- ③ Negación
+-- ③ Negación (CORREGIDO)
 -------------------------------------------------
-
 function s.odinfilter(c)
 	return c:IsFaceup() and c:IsCode(93483212)
 end
@@ -121,7 +114,6 @@ end
 function s.negcon(e,tp,eg,ep,ev,re,r,rp)
 	if rp==tp then return false end
 	if not Duel.IsExistingMatchingCard(s.odinfilter,tp,LOCATION_MZONE,0,1,nil) then return false end
-	if not re:IsActiveType(TYPE_MONSTER+TYPE_SPELL+TYPE_TRAP) then return false end
 	if not Duel.IsChainDisablable(ev) then return false end
 	return re:IsHasCategory(CATEGORY_SPECIAL_SUMMON)
 end
@@ -129,9 +121,10 @@ end
 function s.negcost(e,tp,eg,ep,ev,re,r,rp,chk)
 	local c=e:GetHandler()
 	if chk==0 then return c:IsAbleToRemoveAsCost() end
-	
+	-- CORRECCIÓN: Remoción segura desde Campo o Cementerio usando el Handler directo
 	Duel.Remove(c,POS_FACEUP,REASON_COST)
-
+	
+	-- Efecto retardado para volver a la mano al final del turno
 	local e1=Effect.CreateEffect(c)
 	e1:SetType(EFFECT_TYPE_FIELD+EFFECT_TYPE_CONTINUOUS)
 	e1:SetCode(EVENT_PHASE+PHASE_END)
@@ -152,11 +145,13 @@ end
 function s.negtg(e,tp,eg,ep,ev,re,r,rp,chk)
 	if chk==0 then return true end
 	Duel.SetOperationInfo(0,CATEGORY_NEGATE,eg,1,0,0)
-	Duel.SetOperationInfo(0,CATEGORY_DESTROY,eg,1,0,0)
+	if re:GetHandler():IsRelateToEffect(re) then
+		Duel.SetOperationInfo(0,CATEGORY_DESTROY,eg,1,0,0)
+	end
 end
 
 function s.negop(e,tp,eg,ep,ev,re,r,rp)
-	if Duel.NegateActivation(ev) then
+	if Duel.NegateActivation(ev) and re:GetHandler():IsRelateToEffect(re) then
 		Duel.Destroy(re:GetHandler(),REASON_EFFECT)
 	end
 end
