@@ -1,8 +1,8 @@
--- Dread's Waifu 2.0
+-- Avatar's Waifu 2.0
 local s,id=GetID()
 function s.initial_effect(c)
 	-- Registra las menciones oficiales de los Dioses Malignos
-	aux.AddCodeList(c,62180201,21208154,57793869)
+	aux.AddCodeList(c,21208154,62180201,57793869)
 
 	-------------------------------------------------
 	-- ① Costo de Descarte estilo Zorc + Búsqueda e Invocación Especial
@@ -19,7 +19,7 @@ function s.initial_effect(c)
 	c:RegisterEffect(e1)
 
 	-------------------------------------------------
-	-- ② Invocación Especial desde GY si un DARK es Invocado + Búsqueda de Magia/Trampa
+	-- ② Invocación Especial desde GY + Búsqueda de Magia/Trampa de Avatar
 	-------------------------------------------------
 	local e2=Effect.CreateEffect(c)
 	e2:SetDescription(aux.Stringid(id,1))
@@ -38,23 +38,24 @@ function s.initial_effect(c)
 	c:RegisterEffect(e2b)
 
 	-------------------------------------------------
-	-- ③ NUEVO/CORREGIDO: Efecto al ser Sacrificada estilo EVENT_RELEASE
+	-- ③ Quick Effect: Invocación Normal en Main o Battle Phase
 	-------------------------------------------------
 	local e3=Effect.CreateEffect(c)
 	e3:SetDescription(aux.Stringid(id,2))
-	e3:SetCategory(CATEGORY_DISABLE)
-	e3:SetType(EFFECT_TYPE_SINGLE+EFFECT_TYPE_TRIGGER_O)
-	e3:SetCode(EVENT_RELEASE) -- Usamos el código oficial de tu ejemplo
-	e3:SetProperty(EFFECT_FLAG_DAMAGE_STEP+EFFECT_FLAG_DELAY+EFFECT_FLAG_CARD_TARGET)
+	e3:SetCategory(CATEGORY_SUMMON)
+	e3:SetType(EFFECT_TYPE_QUICK_O)
+	e3:SetCode(EVENT_FREE_CHAIN)
+	e3:SetHintTiming(0,TIMINGS_CHECK_MONSTER+TIMING_MAIN_END+TIMING_BATTLE_START)
+	e3:SetRange(LOCATION_MZONE)
 	e3:SetCountLimit(1,id+200)
-	-- Se eliminó s.negcon para máxima fluidez y evitar errores de consola
-	e3:SetTarget(s.negtg)
-	e3:SetOperation(s.negop)
+	e3:SetCondition(s.nscon)
+	e3:SetTarget(s.nstg)
+	e3:SetOperation(s.nsop)
 	c:RegisterEffect(e3)
 end
 
 -------------------------------------------------
--- ① Funciones del Efecto (1) - Estilo Zorc
+-- ① Funciones del Efecto (1) - Motor de Consistencia
 -------------------------------------------------
 function s.costfilter(c)
 	return c:IsDiscardable()
@@ -96,7 +97,7 @@ function s.thop(e,tp,eg,ep,ev,re,r,rp)
 end
 
 -------------------------------------------------
--- ② Funciones del Efecto (2) - Trigger desde GY
+-- ② Funciones del Efecto (2) - Destino: Avatar (21208154)
 -------------------------------------------------
 function s.cfilter(c,tp)
 	return c:IsFaceup() and c:IsAttribute(ATTRIBUTE_DARK) and c:GetSummonPlayer()==tp
@@ -107,7 +108,7 @@ function s.spcon(e,tp,eg,ep,ev,re,r,rp)
 end
 
 function s.stfilter(c)
-	return c:IsType(TYPE_SPELL+TYPE_TRAP) and aux.IsCodeListed(c,62180201) and c:IsAbleToHand()
+	return c:IsType(TYPE_SPELL+TYPE_TRAP) and aux.IsCodeListed(c,21208154) and c:IsAbleToHand()
 end
 
 function s.sptg(e,tp,eg,ep,ev,re,r,rp,chk)
@@ -124,7 +125,7 @@ function s.spop(e,tp,eg,ep,ev,re,r,rp)
 	if c:IsRelateToEffect(e) and Duel.SpecialSummon(c,0,tp,tp,false,false,POS_FACEUP)>0 then
 		Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_ATOHAND)
 		local g=Duel.SelectMatchingCard(tp,s.stfilter,tp,LOCATION_DECK,0,1,1,nil)
-		if #g>0 then
+		if #g > 0 then
 			Duel.SendtoHand(g,nil,REASON_EFFECT)
 			Duel.ConfirmCards(1-tp,g)
 		end
@@ -132,31 +133,26 @@ function s.spop(e,tp,eg,ep,ev,re,r,rp)
 end
 
 -------------------------------------------------
--- ③ Funciones del Efecto (3) - Target y Operación Limpios
+-- ③ Funciones del Efecto (3) - Invocación Normal Rápida
 -------------------------------------------------
-function s.negtg(e,tp,eg,ep,ev,re,r,rp,chk,chkc)
-	if chkc then return chkc:IsControler(1-tp) and chkc:IsLocation(LOCATION_MZONE) and chkc:IsFaceup() end
-	if chk==0 then return Duel.IsExistingTarget(Card.IsFaceup,tp,0,LOCATION_MZONE,1,nil) end
-	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_NEGATE)
-	local g=Duel.SelectTarget(tp,Card.IsFaceup,tp,0,LOCATION_MZONE,1,1,nil)
-	Duel.SetOperationInfo(0,CATEGORY_DISABLE,g,1,0,0)
+function s.nscon(e,tp,eg,ep,ev,re,r,rp)
+	local ph=Duel.GetCurrentPhase()
+	-- Habilita el efecto rápido tanto en Main Phase 1 y 2, como en cualquier punto de la Battle Phase
+	return (ph==PHASE_MAIN1 or ph==PHASE_MAIN2 or (ph>=PHASE_BATTLE_START and ph<=PHASE_BATTLE))
 end
 
-function s.negop(e,tp,eg,ep,ev,re,r,rp)
-	local c=e:GetHandler()
-	local tc=Duel.GetFirstTarget()
-	if tc and tc:IsFaceup() and tc:IsRelateToEffect(e) and not tc:IsDisabled() then
-		Duel.NegateRelatedChain(tc,RESET_TURN_SET)
-		local e1=Effect.CreateEffect(c)
-		e1:SetType(EFFECT_TYPE_SINGLE)
-		e1:SetCode(EFFECT_DISABLE)
-		e1:SetReset(RESET_EVENT+RESETS_STANDARD)
-		tc:RegisterEffect(e1)
-		local e2=Effect.CreateEffect(c)
-		e2:SetType(EFFECT_TYPE_SINGLE)
-		e2:SetCode(EFFECT_DISABLE_EFFECT)
-		e2:SetValue(RESET_TURN_SET)
-		e2:SetReset(RESET_EVENT+RESETS_STANDARD)
-		tc:RegisterEffect(e2)
+function s.nstg(e,tp,eg,ep,ev,re,r,rp,chk)
+	if chk==0 then 
+		return Duel.IsExistingMatchingCard(Card.IsSummonable,tp,LOCATION_HAND+LOCATION_MZONE,0,1,nil,true,nil)
+	end
+	Duel.SetOperationInfo(0,CATEGORY_SUMMON,nil,1,0,0)
+end
+
+function s.nsop(e,tp,eg,ep,ev,re,r,rp)
+	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_SUMMON)
+	local g=Duel.SelectMatchingCard(tp,Card.IsSummonable,tp,LOCATION_HAND+LOCATION_MZONE,0,1,1,nil,true,nil)
+	local tc=g:GetFirst()
+	if tc then
+		Duel.Summon(tp,tc,true,nil)
 	end
 end

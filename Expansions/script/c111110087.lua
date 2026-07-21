@@ -1,179 +1,150 @@
--- Lillith the Succubus
+-- Eraser's Waifu 2.0
 local s,id=GetID()
 function s.initial_effect(c)
-	
+	-- Registra las menciones oficiales de los Dioses Malignos
+	aux.AddCodeList(c,21208154,62180201,57793869)
+
 	-------------------------------------------------
-	-- (1) IGNITION: Invocación Especial + Equipar (Desde la Mano)
+	-- ① Costo de Descarte estilo Zorc + Búsqueda e Invocación Especial
 	-------------------------------------------------
 	local e1=Effect.CreateEffect(c)
 	e1:SetDescription(aux.Stringid(id,0))
-	e1:SetCategory(CATEGORY_SPECIAL_SUMMON+CATEGORY_EQUIP)
+	e1:SetCategory(CATEGORY_TOHAND+CATEGORY_SEARCH+CATEGORY_SPECIAL_SUMMON)
 	e1:SetType(EFFECT_TYPE_IGNITION)
-	e1:SetProperty(EFFECT_FLAG_CARD_TARGET)
 	e1:SetRange(LOCATION_HAND)
 	e1:SetCountLimit(1,id)
-	e1:SetTarget(s.sptg1)
-	e1:SetOperation(s.spop1)
+	e1:SetCost(s.thcost)
+	e1:SetTarget(s.thtg)
+	e1:SetOperation(s.thop)
 	c:RegisterEffect(e1)
 
 	-------------------------------------------------
-	-- (2) IGNITION: Equipar de GY oponente O de tu DECK (Si no tiene equipos)
+	-- ② Invocación Especial desde GY + Búsqueda de Magia/Trampa de Eraser
 	-------------------------------------------------
 	local e2=Effect.CreateEffect(c)
 	e2:SetDescription(aux.Stringid(id,1))
-	e2:SetCategory(CATEGORY_EQUIP)
-	e2:SetType(EFFECT_TYPE_IGNITION) -- Cambiado a Ignition (Velocidad 1)
-	e2:SetRange(LOCATION_MZONE)
+	e2:SetCategory(CATEGORY_SPECIAL_SUMMON+CATEGORY_TOHAND+CATEGORY_SEARCH)
+	e2:SetType(EFFECT_TYPE_FIELD+EFFECT_TYPE_TRIGGER_O)
+	e2:SetCode(EVENT_SUMMON_SUCCESS)
+	e2:SetProperty(EFFECT_FLAG_DELAY)
+	e2:SetRange(LOCATION_GRAVE)
 	e2:SetCountLimit(1,id+100)
-	e2:SetCondition(s.eqcon2)
-	e2:SetTarget(s.eqtg2)
-	e2:SetOperation(s.eqop2)
+	e2:SetCondition(s.spcon)
+	e2:SetTarget(s.sptg)
+	e2:SetOperation(s.spop)
 	c:RegisterEffect(e2)
+	local e2b=e2:Clone()
+	e2b:SetCode(EVENT_SPSUMMON_SUCCESS)
+	c:RegisterEffect(e2b)
 
 	-------------------------------------------------
-	-- (3) QUICK EFFECT: Invocar la carta que tiene equipada
+	-- ③ CORREGIDO: Efecto al ser Sacrificada estilo EVENT_RELEASE
 	-------------------------------------------------
 	local e3=Effect.CreateEffect(c)
 	e3:SetDescription(aux.Stringid(id,2))
-	e3:SetCategory(CATEGORY_SPECIAL_SUMMON)
-	e3:SetType(EFFECT_TYPE_QUICK_O) -- Cambiado a Quick Effect (Velocidad 2)
-	e3:SetCode(EVENT_FREE_CHAIN)   -- Permite activarlo en cualquier ventana de cadena libre
-	e3:SetProperty(EFFECT_FLAG_CARD_TARGET)
-	e3:SetRange(LOCATION_MZONE)
+	e3:SetCategory(CATEGORY_DESTROY)
+	e3:SetType(EFFECT_TYPE_SINGLE+EFFECT_TYPE_TRIGGER_O)
+	e3:SetCode(EVENT_RELEASE) -- Cambiado a EVENT_RELEASE para máxima estabilidad
+	e3:SetProperty(EFFECT_FLAG_DAMAGE_STEP+EFFECT_FLAG_DELAY+EFFECT_FLAG_CARD_TARGET)
 	e3:SetCountLimit(1,id+200)
-	e3:SetCondition(s.spcon3)
-	e3:SetTarget(s.sptg3)
-	e3:SetOperation(s.spop3)
+	-- Se eliminó s.descon para evitar errores de consola de Lua
+	e3:SetTarget(s.destg)
+	e3:SetOperation(s.desop)
 	c:RegisterEffect(e3)
 end
 
--- Lógica (1)
-function s.eqfilter1(c)
-	return c:IsMonster()
+-------------------------------------------------
+-- ① Funciones del Efecto (1)
+-------------------------------------------------
+function s.costfilter(c)
+	return c:IsDiscardable()
 end
-function s.sptg1(e,tp,eg,ep,ev,re,r,rp,chk,chkc)
-	if chkc then return chkc:IsLocation(LOCATION_GRAVE) and chkc:IsControler(1-tp) and s.eqfilter1(chkc) end
+
+function s.thcost(e,tp,eg,ep,ev,re,r,rp,chk)
+	local c=e:GetHandler()
+	if chk==0 then return Duel.IsExistingMatchingCard(s.costfilter,tp,LOCATION_HAND,0,1,c) and c:IsDiscardable() end
+	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_DISCARD)
+	local g=Duel.SelectMatchingCard(tp,s.costfilter,tp,LOCATION_HAND,0,1,1,c)
+	g:AddCard(c)
+	Duel.SendtoGrave(g,REASON_COST+REASON_DISCARD)
+end
+
+function s.thfilter(c)
+	return c:IsType(TYPE_MONSTER) and not c:IsCode(id)
+		and (aux.IsCodeListed(c,21208154) or aux.IsCodeListed(c,62180201) or aux.IsCodeListed(c,57793869))
+		and c:IsAbleToHand()
+end
+
+function s.thtg(e,tp,eg,ep,ev,re,r,rp,chk)
+	if chk==0 then return Duel.IsExistingMatchingCard(s.thfilter,tp,LOCATION_DECK,0,1,nil) end
+	Duel.SetOperationInfo(0,CATEGORY_TOHAND,nil,1,tp,LOCATION_DECK)
+	Duel.SetOperationInfo(0,CATEGORY_SPECIAL_SUMMON,nil,1,tp,LOCATION_DECK)
+end
+
+function s.thop(e,tp,eg,ep,ev,re,r,rp)
+	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_ATOHAND)
+	local g=Duel.SelectMatchingCard(tp,s.thfilter,tp,LOCATION_DECK,0,1,1,nil)
+	local tc=g:GetFirst()
+	if tc then
+		if Duel.SendtoHand(tc,nil,REASON_EFFECT)>0 then
+			Duel.ConfirmCards(1-tp,tc)
+			if Duel.GetLocationCount(tp,LOCATION_MZONE)>0 then
+				Duel.SpecialSummon(tc,0,tp,tp,true,true,POS_FACEUP)
+			end
+		end
+	end
+end
+
+-------------------------------------------------
+-- ② Funciones del Efecto (2) - Destino: Eraser (57793869)
+-------------------------------------------------
+function s.cfilter(c,tp)
+	return c:IsFaceup() and c:IsAttribute(ATTRIBUTE_DARK) and c:GetSummonPlayer()==tp
+end
+
+function s.spcon(e,tp,eg,ep,ev,re,r,rp)
+	return eg:IsExists(s.cfilter,1,nil,tp) and not eg:IsContains(e:GetHandler())
+end
+
+function s.stfilter(c)
+	return c:IsType(TYPE_SPELL+TYPE_TRAP) and aux.IsCodeListed(c,57793869) and c:IsAbleToHand()
+end
+
+function s.sptg(e,tp,eg,ep,ev,re,r,rp,chk)
 	local c=e:GetHandler()
 	if chk==0 then return Duel.GetLocationCount(tp,LOCATION_MZONE)>0
 		and c:IsCanBeSpecialSummoned(e,0,tp,false,false)
-		and Duel.GetLocationCount(tp,LOCATION_SZONE)>0
-		and Duel.IsExistingTarget(s.eqfilter1,tp,0,LOCATION_GRAVE,1,nil) end
-	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_EQUIP)
-	local g=Duel.SelectTarget(tp,s.eqfilter1,tp,0,LOCATION_GRAVE,1,1,nil)
+		and Duel.IsExistingMatchingCard(s.stfilter,tp,LOCATION_DECK,0,1,nil) end
 	Duel.SetOperationInfo(0,CATEGORY_SPECIAL_SUMMON,c,1,0,0)
-	Duel.SetOperationInfo(0,CATEGORY_EQUIP,g,1,0,0)
-end
-function s.spop1(e,tp,eg,ep,ev,re,r,rp)
-	local c=e:GetHandler()
-	local tc=Duel.GetFirstTarget()
-	if not c:IsRelateToEffect(e) then return end
-	if Duel.SpecialSummon(c,0,tp,tp,false,false,POS_FACEUP)>0 then
-		if tc:IsRelateToEffect(e) and Duel.GetLocationCount(tp,LOCATION_SZONE)>0 then
-			Duel.Equip(tp,tc,c,false)
-			local e1=Effect.CreateEffect(c)
-			e1:SetType(EFFECT_TYPE_SINGLE)
-			e1:SetProperty(EFFECT_FLAG_OWNER_RELATE)
-			e1:SetCode(EFFECT_EQUIP_LIMIT)
-			e1:SetReset(RESET_EVENT+RESETS_STANDARD)
-			e1:SetValue(s.eqlimit)
-			tc:RegisterEffect(e1)
-		end
-	end
-end
-function s.eqlimit(e,c)
-	return e:GetOwner()==c
+	Duel.SetOperationInfo(0,CATEGORY_TOHAND,nil,1,tp,LOCATION_DECK)
 end
 
--- Lógica (2): Ignition - Equipar de GY o Deck
-function s.eqcon2(e,tp,eg,ep,ev,re,r,rp)
-	return #e:GetHandler():GetEquipGroup()==0
-end
-function s.deckfilter(c)
-	return c:IsMonster()
-end
-function s.eqtg2(e,tp,eg,ep,ev,re,r,rp,chk,chkc)
-	if chkc then return chkc:IsLocation(LOCATION_GRAVE) and chkc:IsControler(1-tp) and s.eqfilter1(chkc) end
-	
-	local b1=Duel.IsExistingTarget(s.eqfilter1,tp,0,LOCATION_GRAVE,1,nil)
-	local b2=Duel.IsExistingMatchingCard(s.deckfilter,tp,LOCATION_DECK,0,1,nil)
-	
-	if chk==0 then return Duel.GetLocationCount(tp,LOCATION_SZONE)>0 and (b1 or b2) end
-	
-	local op=0
-	if b1 and b2 then
-		op=Duel.SelectOption(tp,aux.Stringid(id,3),aux.Stringid(id,4))
-	elseif b1 then
-		op=Duel.SelectOption(tp,aux.Stringid(id,3))
-	else
-		op=Duel.SelectOption(tp,aux.Stringid(id,4))+1
-	end
-	e:SetLabel(op)
-	
-	if op==0 then
-		e:SetProperty(EFFECT_FLAG_CARD_TARGET)
-		Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_EQUIP)
-		local g=Duel.SelectTarget(tp,s.eqfilter1,tp,0,LOCATION_GRAVE,1,1,nil)
-		Duel.SetOperationInfo(0,CATEGORY_EQUIP,g,1,0,0)
-	else
-		e:SetProperty(0)
-		Duel.SetOperationInfo(0,CATEGORY_EQUIP,nil,1,tp,LOCATION_DECK)
-	end
-end
-function s.eqop2(e,tp,eg,ep,ev,re,r,rp)
+function s.spop(e,tp,eg,ep,ev,re,r,rp)
 	local c=e:GetHandler()
-	if not c:IsRelateToEffect(e) or c:IsFacedown() or Duel.GetLocationCount(tp,LOCATION_SZONE)<=0 then return end
-	
-	local op=e:GetLabel()
-	if op==0 then
-		local tc=Duel.GetFirstTarget()
-		if tc and tc:IsRelateToEffect(e) then
-			Duel.Equip(tp,tc,c,false)
-			local e1=Effect.CreateEffect(c)
-			e1:SetType(EFFECT_TYPE_SINGLE)
-			e1:SetProperty(EFFECT_FLAG_OWNER_RELATE)
-			e1:SetCode(EFFECT_EQUIP_LIMIT)
-			e1:SetReset(RESET_EVENT+RESETS_STANDARD)
-			e1:SetValue(s.eqlimit)
-			tc:RegisterEffect(e1)
-		end
-	else
-		Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_EQUIP)
-		local g=Duel.SelectMatchingCard(tp,s.deckfilter,tp,LOCATION_DECK,0,1,1,nil)
-		local tc=g:GetFirst()
-		if tc then
-			Duel.Equip(tp,tc,c,false)
-			local e1=Effect.CreateEffect(c)
-			e1:SetType(EFFECT_TYPE_SINGLE)
-			e1:SetProperty(EFFECT_FLAG_OWNER_RELATE)
-			e1:SetCode(EFFECT_EQUIP_LIMIT)
-			e1:SetReset(RESET_EVENT+RESETS_STANDARD)
-			e1:SetValue(s.eqlimit)
-			tc:RegisterEffect(e1)
+	if c:IsRelateToEffect(e) and Duel.SpecialSummon(c,0,tp,tp,false,false,POS_FACEUP)>0 then
+		Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_ATOHAND)
+		local g=Duel.SelectMatchingCard(tp,s.stfilter,tp,LOCATION_DECK,0,1,1,nil)
+		if #g>0 then
+			Duel.SendtoHand(g,nil,REASON_EFFECT)
+			Duel.ConfirmCards(1-tp,g)
 		end
 	end
 end
 
--- Lógica (3): Quick Effect - Invocar equipo
-function s.spcon3(e,tp,eg,ep,ev,re,r,rp)
-	local g=e:GetHandler():GetEquipGroup()
-	return #g>0
+-------------------------------------------------
+-- ③ Funciones del Efecto (3) - Target y Operación Limpios sin Errores
+-------------------------------------------------
+function s.destg(e,tp,eg,ep,ev,re,r,rp,chk,chkc)
+	if chkc then return chkc:IsControler(1-tp) and chkc:IsOnField() end
+	if chk==0 then return Duel.IsExistingTarget(nil,tp,0,LOCATION_ONFIELD,1,nil) end
+	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_DESTROY)
+	local g=Duel.SelectTarget(tp,nil,tp,0,LOCATION_ONFIELD,1,1,nil)
+	Duel.SetOperationInfo(0,CATEGORY_DESTROY,g,1,0,0)
 end
-function s.spfilter3(c,e,tp)
-	return c:IsCanBeSpecialSummoned(e,0,tp,false,false)
-end
-function s.sptg3(e,tp,eg,ep,ev,re,r,rp,chk,chkc)
-	local c=e:GetHandler()
-	if chkc then return chkc:IsLocation(LOCATION_SZONE) and chkc:IsControler(tp) and c:GetEquipGroup():IsContains(chkc) and s.spfilter3(chkc,e,tp) end
-	if chk==0 then return Duel.GetLocationCount(tp,LOCATION_MZONE)>0
-		and Duel.IsExistingTarget(s.spfilter3,tp,LOCATION_SZONE,0,1,nil,e,tp) end
-	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_SPSUMMON)
-	local g=c:GetEquipGroup():Filter(s.spfilter3,nil,e,tp):Select(tp,1,1,nil)
-	Duel.SetTargetCard(g)
-	Duel.SetOperationInfo(0,CATEGORY_SPECIAL_SUMMON,g,1,0,0)
-end
-function s.spop3(e,tp,eg,ep,ev,re,r,rp)
+
+function s.desop(e,tp,eg,ep,ev,re,r,rp)
 	local tc=Duel.GetFirstTarget()
 	if tc and tc:IsRelateToEffect(e) then
-		Duel.SpecialSummon(tc,0,tp,tp,false,false,POS_FACEUP)
+		Duel.Destroy(tc,REASON_EFFECT)
 	end
 end

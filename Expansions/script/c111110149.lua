@@ -93,8 +93,8 @@ function s.spcon(e,tp,eg,ep,ev,re,r,rp)
 	local is_phase = (ph==PHASE_MAIN1 or ph==PHASE_MAIN2 or (ph>=PHASE_BATTLE_START and ph<=PHASE_BATTLE))
 	if not is_phase then return false end
 	
-	-- CORRECCIÓN: Verifica que sea un EFECTO DE MONSTRUO y que pertenezca al arquetipo "Nordic"
-	return re:IsMonsterEffect() and re:GetHandler():IsSetCard(0x42)
+	-- SOLUCIÓN: Verifica si el efecto activado es de un Monstruo y si esa carta es "Nordic"
+	return re:IsActiveType(TYPE_MONSTER) and re:GetHandler():IsSetCard(0x42)
 end
 
 
